@@ -157,9 +157,6 @@ vim.opt.termguicolors = true
 vim.opt.ignorecase = true
 vim.opt.smartcase = true
 
--- Keep signcolumn on by default
-vim.opt.signcolumn = "yes"
---
 -- Display lines as one long line
 vim.opt.wrap = false
 
@@ -198,6 +195,7 @@ vim.opt.cinkeys = "0{,0},0),0],0#,!^F,o,O,e"
 
 -- GUI settings
 vim.opt.guifont = "Consolas:12"
+vim.opt.signcolumn = "yes:4"
 vim.cmd "set linespace=3"
 vim.g.neovide_refresh_rate = 165
 
