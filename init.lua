@@ -197,7 +197,8 @@ vim.opt.sidescrolloff = 8
 vim.opt.cinkeys = "0{,0},0),0],0#,!^F,o,O,e"
 
 -- GUI settings
-vim.opt.guifont = "JetBrainsMono Nerd Font:13"
+vim.opt.guifont = "Consolas:12"
+vim.cmd "set linespace=4"
 vim.g.neovide_refresh_rate = 165
 
 vim.g.neovide_cursor_animation_length = 0.035
