@@ -194,8 +194,9 @@ vim.opt.sidescrolloff = 8
 vim.opt.cinkeys = "0{,0},0),0],0#,!^F,o,O,e"
 
 -- GUI settings
-vim.opt.guifont = "Consolas:12"
-vim.opt.signcolumn = "yes:4"
+vim.opt.guifont = "JetBrainsMono Nerd Font:12"
+--vim.opt.foldcolumn = "2"
+vim.opt.signcolumn = "yes:5"
 vim.cmd "set linespace=3"
 vim.g.neovide_refresh_rate = 165
 
@@ -224,7 +225,7 @@ vim.keymap.set("v", ">", ">gv")
 
 -- Set highlight on search, but clear on pressing <Esc> in normal mode
 vim.opt.hlsearch = true
-vim.keymap.set("n", "<Esc>", "<cmd>nohlsearch<CR>")
+vim.keymap.set("n", "<leader>h", "<cmd>nohlsearch<CR>", { desc = "No Highlight" })
 
 -- Comments
 vim.keymap.set("n", "<leader>/", "<cmd>lua require('Comment.api').toggle.linewise()<CR>", { desc = "Comment line" })
@@ -265,36 +266,45 @@ vim.keymap.set("n", "<C-l>", "<C-w>l")
 -- Highlight when yanking (copying) text
 --  Try it with `yap` in normal mode
 --  See `:help vim.highlight.on_yank()`
-vim.api.nvim_create_autocmd("TextYankPost", {
-    desc = "Highlight when yanking (copying) text",
-    group = vim.api.nvim_create_augroup("kickstart-highlight-yank", { clear = true }),
-    callback = function()
-        vim.highlight.on_yank()
-    end,
-})
+-- vim.api.nvim_create_autocmd("TextYankPost", {
+--     desc = "Highlight when yanking (copying) text",
+--     group = vim.api.nvim_create_augroup("kickstart-highlight-yank", { clear = true }),
+--     callback = function()
+--         vim.highlight.on_yank()
+--     end,
+-- })
 
--- TODO: This does not seem to work
-vim.api.nvim_create_autocmd("BufNewFile, BufRead", {
-    desc = "Treat shader files using the .glsl extension",
-    pattern = {
-        "*.glsl",
-        "*.comp",
-        "*.vert",
-        "*.frag",
-        "*.geom",
-        "*.tese",
-        "*.tesc",
-        "*.mesh",
-        "*.task",
-        "*.rgen",
-        "*.rint",
-        "*.rmiss",
-        "*.rahit",
-        "*.rchit",
-        "*.rcall",
-    },
-    command = "set ft=glsl",
-})
+vim.cmd [[
+    augroup _general_settings
+        autocmd!
+        autocmd FileType qf,help,man,lspinfo nnoremap <silent> <buffer> q :close<CR>
+        autocmd TextYankPost * silent!lua require('vim.highlight').on_yank({timeout = 200})
+        autocmd BufWinEnter * :set formatoptions-=cro
+        autocmd FileType qf set nobuflisted
+    augroup end
+
+    augroup _git
+        autocmd!
+        autocmd FileType gitcommit setlocal wrap
+        autocmd FileType gitcommit setlocal spell
+    augroup end
+
+    augroup _markdown
+        autocmd!
+        autocmd FileType markdown setlocal wrap
+        autocmd FileType markdown setlocal spell
+    augroup end
+
+    augroup _auto_resize
+        autocmd!
+        autocmd VimResized * tabdo wincmd =
+    augroup end
+
+    augroup _guess_indent
+        autocmd!
+        autocmd BufWinEnter * silent!GuessIndent
+    augroup end
+]]
 
 -- [[ Install `lazy.nvim` plugin manager ]]
 --    See `:help lazy.nvim.txt` or https://github.com/folke/lazy.nvim for more info
@@ -318,8 +328,23 @@ vim.opt.rtp:prepend(lazypath)
 -- NOTE: Here is where you install your plugins.
 require("lazy").setup({
     -- NOTE: Plugins can be added with a link (or for a github repo: 'owner/repo' link).
-    "tpope/vim-sleuth", -- Detect tabstop and shiftwidth automatically
-
+    {
+        "nmac427/guess-indent.nvim",
+        opts = {
+            auto_cmd = false, -- Set to false to disable automatic execution
+            override_editorconfig = false, -- Set to true to override settings set by .editorconfig
+            filetype_exclude = { -- A list of filetypes for which the auto command gets disabled
+                "netrw",
+                "tutor",
+            },
+            buftype_exclude = { -- A list of buffer types for which the auto command gets disabled
+                "help",
+                "nofile",
+                "terminal",
+                "prompt",
+            },
+        },
+    },
     -- NOTE: Plugins can also be added by using a table,
     -- with the first argument being the link and the following
     -- keys can be used to configure plugin behavior/loading/etc.
@@ -881,7 +906,7 @@ require("lazy").setup({
                 -- Disable "format_on_save lsp_fallback" for languages that don't
                 -- have a well standardized coding style. You can add additional
                 -- languages here or re-enable it for the disabled ones.
-                local disable_filetypes = { c = true, cpp = true }
+                local disable_filetypes = { lua = true, c = true, cpp = true }
                 return {
                     timeout_ms = 500,
                     lsp_fallback = not disable_filetypes[vim.bo[bufnr].filetype],
@@ -932,6 +957,7 @@ require("lazy").setup({
             -- Adds other completion capabilities.
             --  nvim-cmp does not ship with all sources by default. They are split
             --  into multiple repos for maintenance purposes.
+            "hrsh7th/cmp-nvim-lsp-signature-help",
             "hrsh7th/cmp-nvim-lsp",
             "hrsh7th/cmp-buffer",
             "hrsh7th/cmp-path",
@@ -950,6 +976,34 @@ require("lazy").setup({
                 return col == 0 or vim.fn.getline("."):sub(col, col):match "%s"
             end
 
+            local kind_icons = {
+                Text = "",
+                Method = "",
+                Function = "",
+                Constructor = "",
+                Field = "",
+                Variable = "",
+                Class = "",
+                Interface = "",
+                Module = "",
+                Property = "",
+                Unit = "",
+                Value = "",
+                Enum = "",
+                Keyword = "",
+                Snippet = "",
+                Color = "",
+                File = "",
+                Reference = "",
+                Folder = "",
+                EnumMember = "",
+                Constant = "",
+                Struct = "",
+                Event = "",
+                Operator = "",
+                TypeParameter = "",
+            }
+
             cmp.setup {
                 snippet = {
                     expand = function(args)
@@ -957,6 +1011,15 @@ require("lazy").setup({
                     end,
                 },
                 completion = { completeopt = "menu,menuone,noinsert,noselect" },
+                window = {
+                    documentation = cmp.config.disable,
+                    completion = {
+                        scrollbar = true,
+                        -- winhighlight = "Normal:Pmenu,FloatBorder:Pmenu,Search:None",
+                        -- col_offset = -3,
+                        -- side_padding = 0,
+                    },
+                },
 
                 -- For an understanding of why these mappings were
                 -- chosen, you will need to read `:help ins-completion`
@@ -1005,11 +1068,45 @@ require("lazy").setup({
                         "s",
                     }),
                 },
+                formatting = {
+                    expandable_indicator = false,
+                    fields = { "kind", "abbr", "menu" },
+                    format = function(entry, vim_item)
+                        -- Use this to make the string fields in vim_item constant length
+                        local function clamp(str, length)
+                            if str == nil then
+                                return
+                            end
+
+                            local current_length = #str
+                            if current_length > length then
+                                -- Trim the string if it's longer than the desired length and add "..."
+                                return string.sub(str, 1, length - 3) .. "..."
+                            elseif current_length < length then
+                                -- Add whitespaces to the end if it's shorter than the desired length
+                                return str .. string.rep(" ", length - current_length)
+                            else
+                                -- String is already the desired length
+                                return str
+                            end
+                        end
+
+                        vim_item.abbr = clamp(vim_item.abbr, 30)
+                        vim_item.abbr = vim_item.abbr .. "      " -- Add some padding
+                        vim_item.menu = clamp(entry:get_completion_item().detail, 20)
+
+                        -- This concatonates the icons with the name of the item kind
+                        vim_item.kind = string.format("%s", kind_icons[vim_item.kind])
+
+                        return vim_item
+                    end,
+                },
                 sources = {
+                    { name = "path" },
                     { name = "nvim_lsp" },
                     { name = "luasnip" },
                     { name = "buffer" },
-                    { name = "path" },
+                    { name = "nvim_lsp_signature_help" },
                 },
                 confirm_opts = {
                     behavior = cmp.ConfirmBehavior.Replace,
@@ -1019,6 +1116,32 @@ require("lazy").setup({
                     ghost_text = true,
                 },
             }
+
+            -- Colors
+            vim.api.nvim_set_hl(0, "CmpItemKind", { bold = true })
+            vim.api.nvim_set_hl(0, "CmpItemAbbr", { link = "CursorLineNr" })
+            vim.api.nvim_set_hl(0, "CmpItemKindText", { link = "CursorLineNr" })
+
+            vim.api.nvim_set_hl(0, "CmpItemAbbrMatch", { bg = "NONE", fg = "NONE" })
+            vim.api.nvim_set_hl(0, "CmpItemAbbrMatchFuzzy", { link = "CmpIntemAbbrMatch" })
+
+            -- vim.api.nvim_set_hl(0, "Pmenu", { bg = "#252526", fg = "#CFCFCF" })
+            -- -- gray
+            -- vim.api.nvim_set_hl(0, "CmpItemAbbrDeprecated", { bg = "NONE", strikethrough = true, fg = "#808080" })
+            -- -- blue
+            -- vim.api.nvim_set_hl(0, "CmpItemAbbrMatch", { bg = "NONE", fg = "#569CD6" })
+            -- vim.api.nvim_set_hl(0, "CmpItemAbbrMatchFuzzy", { link = "CmpIntemAbbrMatch" })
+            -- -- light blue
+            -- vim.api.nvim_set_hl(0, "CmpItemKindVariable", { bg = "#FFFFFF", fg = "#9CDCFE" })
+            -- vim.api.nvim_set_hl(0, "CmpItemKindInterface", { link = "CmpItemKindVariable" })
+            -- vim.api.nvim_set_hl(0, "CmpItemKindText", { link = "CmpItemKindVariable" })
+            -- -- pink
+            -- vim.api.nvim_set_hl(0, "CmpItemKindFunction", { bg = "NONE", fg = "#C586C0" })
+            -- vim.api.nvim_set_hl(0, "CmpItemKindMethod", { link = "CmpItemKindFunction" })
+            -- -- front
+            -- vim.api.nvim_set_hl(0, "CmpItemKindKeyword", { bg = "NONE", fg = "#D4D4D4" })
+            -- vim.api.nvim_set_hl(0, "CmpItemKindProperty", { link = "CmpItemKindKeyword" })
+            -- vim.api.nvim_set_hl(0, "CmpItemKindUnit", { link = "CmpItemKindKeyword" })
         end,
     },
 
@@ -1034,10 +1157,23 @@ require("lazy").setup({
             -- Like many other themes, this one has different styles, and you could load
             -- any other, such as 'tokyonight-storm', 'tokyonight-moon', or 'tokyonight-day'.
             vim.cmd.colorscheme "tokyonight-night"
-
             -- You can configure highlights by doing something like:
-            vim.cmd.hi "Comment gui=none"
+            -- vim.cmd.hi "Comment gui=none"
         end,
+        opts = {
+            terminal_colors = true,
+            styles = {
+                -- Style to be applied to different syntax groups
+                -- Value is any valid attr-list value for `:help nvim_set_hl`
+                comments = { italic = false },
+                keywords = { italic = false },
+                functions = {},
+                variables = {},
+                -- Background styles. Can be "dark", "transparent" or "normal"
+                sidebars = "dark", -- style for sidebars, see below
+                floats = "dark", -- style for floating windows
+            },
+        },
     },
 
     -- Highlight todo, notes, etc in comments
@@ -1045,29 +1181,49 @@ require("lazy").setup({
         "folke/todo-comments.nvim",
         event = "VimEnter",
         dependencies = { "nvim-lua/plenary.nvim" },
-        opts = {
-            signs = false,
-            highlight = {
-                before = "", -- "fg" or "bg" or empty
-                keyword = "fg", -- "fg", "bg", "wide" or empty. (wide is the same as bg, but will also highlight surrounding characters)
-                after = "", -- "fg" or "bg" or empty
-                pattern = [[.*<(KEYWORDS)(\([^\)]*\))?:]],
-                comments_only = true, -- uses treesitter to match keywords in comments only
-                max_line_len = 400, -- ignore lines longer than this
-                exclude = {}, -- list of file types to exclude highlighting
-            },
-            search = {
-                command = "rg",
-                args = {
-                    "--color=never",
-                    "--no-heading",
-                    "--with-filename",
-                    "--line-number",
-                    "--column",
+        config = function()
+            local todo_comments = require "todo-comments"
+            todo_comments.setup {
+                signs = false,
+                highlight = {
+                    before = "", -- "fg" or "bg" or empty
+                    keyword = "fg", -- "fg", "bg", "wide" or empty. (wide is the same as bg, but will also highlight surrounding characters)
+                    after = "", -- "fg" or "bg" or empty
+                    pattern = [[.*<(KEYWORDS)(\([^\)]*\))?:]],
+                    comments_only = true, -- uses treesitter to match keywords in comments only
+                    max_line_len = 400, -- ignore lines longer than this
+                    exclude = {}, -- list of file types to exclude highlighting
                 },
-                pattern = [[\b(KEYWORDS)(\([^\)]*\))?:]],
-            },
-        },
+                search = {
+                    command = "rg",
+                    args = {
+                        "--color=never",
+                        "--no-heading",
+                        "--with-filename",
+                        "--line-number",
+                        "--column",
+                    },
+                    pattern = [[\b(KEYWORDS)(\([^\)]*\))?:]],
+                },
+            }
+
+            -- Manually set highlight color
+            --
+            -- FIX: FIXING
+            vim.cmd.hi "TodoFgFIX gui=bold guifg=#FF8400"
+            -- HACK: HACKING
+            vim.cmd.hi "TodoFgHACK gui=bold guifg=#FF8400"
+            -- NOTE: NOTING
+            vim.cmd.hi "TodoFgNOTE gui=bold guifg=#18C8EC"
+            -- PERF: PERFING
+            vim.cmd.hi "TodoFgPERF gui=bold guifg=#FF8400"
+            -- TEST: TESTING
+            vim.cmd.hi "TodoFgTEST gui=bold guifg=#FF8400"
+            -- TODO: TODO
+            vim.cmd.hi "TodoFgTODO gui=bold guifg=#FF8400"
+            -- WARN: WARNING
+            vim.cmd.hi "TodoFgWARN gui=bold guifg=#FF8400"
+        end,
     },
     { -- Collection of various small independent plugins/modules
         "echasnovski/mini.nvim",
@@ -1137,6 +1293,32 @@ require("lazy").setup({
         end,
     },
     {
+        "tikhomirov/vim-glsl",
+        config = function()
+            vim.api.nvim_create_autocmd({ "BufNewFile, BufRead" }, {
+                desc = "Treat shader files using the .glsl extension",
+                pattern = {
+                    "*.glsl",
+                    "*.comp",
+                    "*.vert",
+                    "*.frag",
+                    "*.geom",
+                    "*.tese",
+                    "*.tesc",
+                    "*.mesh",
+                    "*.task",
+                    "*.rgen",
+                    "*.rint",
+                    "*.rmiss",
+                    "*.rahit",
+                    "*.rchit",
+                    "*.rcall",
+                },
+                command = "set ft=glsl",
+            })
+        end,
+    },
+    {
         "windwp/nvim-autopairs",
         config = function()
             local npairs = require "nvim-autopairs"
@@ -1168,27 +1350,24 @@ require("lazy").setup({
         end,
     },
     {
-        "ray-x/lsp_signature.nvim",
-        dependencies = {
-            "neovim/nvim-lspconfig",
-        },
-        opts = {
-            bind = true,
-            doc_lines = 0,
-            floating_window = false,
-            fix_pos = true,
-            hint_enable = true,
-            hint_prefix = " ",
-            hint_scheme = "DiagnosticOk",
-            hi_parameter = "Search",
-            max_height = 22,
-            max_width = 120, -- max_width of signature floating_window, line will be wrapped if exceed max_width
-            handler_opts = {
-                border = "single", -- double, single, shadow, none
-            },
-            zindex = 200, -- by default it will be on top of all floating windows, set to 50 send it to bottom
-            padding = "", -- character to pad on left and right of signature can be ' ', or '|'  etc
-        },
+        "norcalli/nvim-colorizer.lua",
+        config = function()
+            -- #aabbcc
+            local colorizer = require "colorizer"
+            colorizer.setup({ "*", "!cpp", "!c", "!glsl" }, {
+                RGB = true, -- #RGB hex codes
+                RRGGBB = true, -- #RRGGBB hex codes
+                names = false, -- "Name" codes like Blue
+                RRGGBBAA = false, -- #RRGGBBAA hex codes
+                rgb_fn = false, -- CSS rgb() and rgba() functions
+                hsl_fn = false, -- CSS hsl() and hsla() functions
+                css = false, -- Enable all CSS features: rgb_fn, hsl_fn, names, RGB, RRGGBB
+                css_fn = false, -- Enable all CSS *functions*: rgb_fn, hsl_fn
+
+                -- Available modes: foreground, background
+                mode = "background", -- Set the display mode.
+            })
+        end,
     },
     {
         "akinsho/toggleterm.nvim",
