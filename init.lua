@@ -1,4 +1,3 @@
--- Windows specific stuff like (lang, shell, clipboard)
 if vim.fn.has "win32" == 1 then
     vim.cmd [[language en_US]]
     vim.opt.shell = "pwsh.exe"
@@ -68,6 +67,8 @@ vim.opt.termguicolors = true
 vim.opt.ignorecase = true
 vim.opt.smartcase = true
 
+vim.opt.hlsearch = true
+
 -- Display lines as one long line
 vim.opt.wrap = false
 
@@ -105,20 +106,55 @@ vim.opt.sidescrolloff = 8
 vim.opt.cinkeys = "0{,0},0),0],0#,!^F,o,O,e"
 
 -- GUI settings
-vim.opt.guifont = "JetBrainsMono Nerd Font:10"
+--vim.opt.guifont = "NotoSansM Nerd Font:h12"
 --vim.opt.foldcolumn = "2"
 vim.opt.signcolumn = "yes:5"
-vim.cmd "set linespace=2"
+vim.cmd [[ set guicursor=i:ver25-blinkwait10-blinkon500-blinkoff500 ]]
+
+vim.cmd "set linespace=3"
 vim.g.neovide_refresh_rate = 165
+vim.g.neovide_no_idle = true
+vim.g.neovide_confirm_quit = true
 
 vim.g.neovide_cursor_animation_length = 0.035
 vim.g.neovide_transparency = 1.0
--- vim.g.neovide_floating_opacity=0.4
-vim.g.neovide_floating_blur = "v:false"
-vim.g.neovide_remember_window_size = "v:true"
+vim.g.neovide_floating_opacity = 0.4
+vim.g.neovide_floating_blur = true
+vim.g.neovide_remember_window_size = true
+vim.g.neovide_scale_factor = 1.5
+vim.g.neovide_scroll_animation_length = 0.18
+vim.g.neovide_cursor_animate_command_line = false
+vim.g.neovide_cursor_smooth_blink = true
+vim.g.neovide_scroll_animation_far_lines = 9999
+vim.g.neovide_hide_mouse_when_typing = true
+
+-- Change font size in neovide
+local change_scale_factor = function(delta)
+    vim.g.neovide_scale_factor = vim.g.neovide_scale_factor * delta
+    vim.api.nvim_input "<C-l>"
+end
+
+vim.keymap.set("n", "<c-+>", function()
+    change_scale_factor(1.10)
+end)
+vim.keymap.set("n", "<c-->", function()
+    change_scale_factor(1 / 1.10)
+end)
+vim.keymap.set("n", "<C-ScrollWheelUp>", function()
+    change_scale_factor(1.10)
+end)
+vim.keymap.set("n", "<C-ScrollWheelDown>", function()
+    change_scale_factor(1 / 1.10)
+end)
+
 
 -- [[ Basic Keymaps ]]
 --  See `:help vim.keymap.set()`
+
+local which_key_mappins = {
+    ["<leader>s"] = { name = "[S]earch", _ = "which_key_ignore" },
+    ["<leader>l"] = { name = "[L]SP", _ = "which_key_ignore" },
+}
 
 vim.cmd "set whichwrap+=<,>,[,],h,l"
 vim.cmd [[set iskeyword+=-]]
@@ -135,7 +171,6 @@ vim.keymap.set("v", "<", "<gv")
 vim.keymap.set("v", ">", ">gv")
 
 -- Set highlight on search, but clear on pressing <Esc> in normal mode
-vim.opt.hlsearch = true
 vim.keymap.set("n", "<leader>h", "<cmd>nohlsearch<CR>", { desc = "No Highlight" })
 
 -- Comments
@@ -164,39 +199,75 @@ vim.keymap.set("n", "<leader>a", "<Plug>(easymotion-overwin-f2)", { desc = "Easy
 -- Package control
 vim.keymap.set("n", "<leader>L", "<cmd>Lazy show<CR>", { desc = "Package Control ([L]azy)" })
 
+-- Nvim tree
+vim.keymap.set("n", "<leader>e", "<cmd>NvimTreeToggle<CR>", { desc = "[E]xplorer" })
+
+-- Buffers
+local function smart_quit()
+    local bufnr = vim.api.nvim_get_current_buf()
+    local modified = vim.api.nvim_buf_get_option(bufnr, "modified")
+    if modified then
+        vim.ui.input({
+            prompt = "You have unsaved changes. Quit anyway? (y/n) ",
+        }, function(input)
+            if input == "y" then
+                vim.cmd "q!"
+            end
+        end)
+    else
+        vim.cmd "q!"
+    end
+end
+vim.keymap.set("n", "<leader>q", smart_quit, { desc = "[E]xplorer" })
+
+-- Telescope
+vim.keymap.set("n", "<C-p>", "<cmd>Telescope find_files<CR>", { desc = "[F]iles" })
+vim.keymap.set("n", "<leader>f", "<cmd>Telescope find_files<CR>", { desc = "[F]iles" })
+vim.keymap.set("n", "<leader>st", "<cmd>Telescope live_grep<CR>", { desc = "Search Text" })
+vim.keymap.set("n", "<leader>P", "<cmd>Telescope projects<CR>", { desc = "[P]rojects" })
+
+vim.keymap.set("n", "<leader>_", function()
+    require("telescope.builtin").find_files { cwd = vim.fn.stdpath "config" }
+end, { desc = "Config Files" })
+
 -- [[ Basic Autocommands ]]
 --  See `:help lua-guide-autocommands`
 vim.cmd [[
-    augroup _general_settings
-        autocmd!
-        autocmd FileType qf,help,man,lspinfo nnoremap <silent> <buffer> q :close<CR>
-        autocmd TextYankPost * silent!lua require('vim.highlight').on_yank({timeout = 200})
-        autocmd BufWinEnter * :set formatoptions-=cro
-        autocmd FileType qf set nobuflisted
-    augroup end
+     augroup _general_settings
+         autocmd!
+         autocmd FileType qf,help,man,lspinfo nnoremap <silent> <buffer> q :close<CR>
+         autocmd TextYankPost * silent!lua require('vim.highlight').on_yank({timeout = 200})
+         autocmd BufWinEnter * :set formatoptions-=cro
+         autocmd FileType qf set nobuflisted
+     augroup end
 
-    augroup _git
-        autocmd!
-        autocmd FileType gitcommit setlocal wrap
-        autocmd FileType gitcommit setlocal spell
-    augroup end
+     augroup _git
+         autocmd!
+         autocmd FileType gitcommit setlocal wrap
+         autocmd FileType gitcommit setlocal spell
+     augroup end
 
-    augroup _markdown
-        autocmd!
-        autocmd FileType markdown setlocal wrap
-        autocmd FileType markdown setlocal spell
-    augroup end
+     augroup _markdown
+         autocmd!
+         autocmd FileType markdown setlocal wrap
+         autocmd FileType markdown setlocal spell
+     augroup end
 
-    augroup _auto_resize
-        autocmd!
-        autocmd VimResized * tabdo wincmd =
-    augroup end
+     augroup _auto_resize
+         autocmd!
+         autocmd VimResized * tabdo wincmd =
+     augroup end
 
-    augroup _guess_indent
+     augroup _guess_indent
+         autocmd!
+         autocmd BufWinEnter * silent!GuessIndent
+     augroup end
+
+     augroup _glsl
         autocmd!
-        autocmd BufWinEnter * silent!GuessIndent
-    augroup end
-]]
+        autocmd! BufNewFile,BufRead *.vert,*.frag, *.geom, *.comp, set ft=glsl
+     augroup end
+ ]]
 
 -- [[ Install `lazy.nvim` plugin manager ]]
 --    See `:help lazy.nvim.txt` or https://github.com/folke/lazy.nvim for more info
@@ -379,15 +450,8 @@ require("lazy").setup({
                 },
             }
             -- Document e
-            -- xisting key chains
-            which_key.register {
-                -- ['<leader>c'] = { name = '[C]ode', _ = 'which_key_ignore' },
-                -- ['<leader>d'] = { name = '[D]ocument', _ = 'which_key_ignore' },
-                -- ['<leader>r'] = { name = '[R]ename', _ = 'which_key_ignore' },
-                -- ['<leader>s'] = { name = '[S]earch', _ = 'which_key_ignore' },
-                -- ['<leader>w'] = { name = '[W]orkspace', _ = 'which_key_ignore' },
-                ["<leader>l"] = { name = "[L]SP", _ = "which_key_ignore" },
-            }
+            -- existing key chains
+            which_key.register(which_key_mappins)
         end,
     },
     { -- Fuzzy Finder (files, lsp, etc)
@@ -444,43 +508,6 @@ require("lazy").setup({
             -- Enable Telescope extensions if they are installed
             pcall(require("telescope").load_extension, "fzf")
             pcall(require("telescope").load_extension, "ui-select")
-
-            -- See `:help telescope.builtin`
-            local builtin = require "telescope.builtin"
-            vim.keymap.set("n", "<leader>sh", builtin.help_tags, { desc = "[S]earch [H]elp" })
-            vim.keymap.set("n", "<leader>sk", builtin.keymaps, { desc = "[S]earch [K]eymaps" })
-            vim.keymap.set("n", "<leader>sf", builtin.find_files, { desc = "[S]earch [F]iles" })
-            vim.keymap.set("n", "<leader>ss", builtin.builtin, { desc = "[S]earch [S]elect Telescope" })
-            vim.keymap.set("n", "<leader>sw", builtin.grep_string, { desc = "[S]earch current [W]ord" })
-            vim.keymap.set("n", "<leader>sg", builtin.live_grep, { desc = "[S]earch by [G]rep" })
-            vim.keymap.set("n", "<leader>sd", builtin.diagnostics, { desc = "[S]earch [D]iagnostics" })
-            vim.keymap.set("n", "<leader>sr", builtin.resume, { desc = "[S]earch [R]esume" })
-            vim.keymap.set("n", "<leader>s.", builtin.oldfiles, { desc = '[S]earch Recent Files ("." for repeat)' })
-            vim.keymap.set("n", "<leader><leader>", builtin.buffers, { desc = "[ ] Find existing buffers" })
-
-            -- FIXME:
-            -- Slightly advanced example of overriding default behavior and theme
-            -- vim.keymap.set('n', '<leader>/', function()
-            --   -- You can pass additional configuration to Telescope to change the theme, layout, etc.
-            --   builtin.current_buffer_fuzzy_find(require('telescope.themes').get_dropdown {
-            --     winblend = 10,
-            --     previewer = false,
-            --   })
-            -- end, { desc = '[/] Fuzzily search in current buffer' })
-
-            -- It's also possible to pass additional configuration options.
-            --  See `:help telescope.builtin.live_grep()` for information about particular keys
-            -- vim.keymap.set('n', '<leader>s/', function()
-            --   builtin.live_grep {
-            --     grep_open_files = true,
-            --     prompt_title = 'Live Grep in Open Files',
-            --   }
-            -- end, { desc = '[S]earch [/] in Open Files' })
-
-            -- Shortcut for searching your Neovim configuration files
-            vim.keymap.set("n", "<leader>sn", function()
-                builtin.find_files { cwd = vim.fn.stdpath "config" }
-            end, { desc = "[S]earch [N]eovim files" })
         end,
     },
 
@@ -573,6 +600,8 @@ require("lazy").setup({
                     --
                     -- In this case, we create a function that lets us more easily define mappings specific
                     -- for LSP related items. It sets the mode, buffer and description for us each time.
+
+                    -- TODO: Move these out to all other mappings
                     local map = function(keys, func, desc)
                         vim.keymap.set("n", keys, func, { buffer = event.buf, desc = "LSP: " .. desc })
                     end
@@ -596,7 +625,7 @@ require("lazy").setup({
 
                     -- Fuzzy find all the symbols in your current document.
                     --  Symbols are things like variables, functions, types, etc.
-                    map("<leader>ls", require("telescope.builtin").lsp_document_symbols, "[Document [s]ymbols")
+                    map("<leader>ls", require("telescope.builtin").lsp_document_symbols, "Document [s]ymbols")
 
                     -- Fuzzy find all the symbols in your current workspace.
                     --  Similar to document symbols, except searches over your entire project.
@@ -719,29 +748,22 @@ require("lazy").setup({
 
     { -- Autoformat
         "stevearc/conform.nvim",
+        enabled = false,
         lazy = false,
+        -- TODO: Move this out to other mappings
         keys = {
             {
-                "<leader>f",
+                "<leader>lf",
                 function()
                     require("conform").format { async = true, lsp_fallback = true }
                 end,
                 mode = "",
-                desc = "[F]ormat buffer",
+                desc = "LSP: [F]ormat buffer",
             },
         },
         opts = {
             notify_on_error = false,
-            format_on_save = function(bufnr)
-                -- Disable "format_on_save lsp_fallback" for languages that don't
-                -- have a well standardized coding style. You can add additional
-                -- languages here or re-enable it for the disabled ones.
-                local disable_filetypes = { lua = true, c = true, cpp = true }
-                return {
-                    timeout_ms = 500,
-                    lsp_fallback = not disable_filetypes[vim.bo[bufnr].filetype],
-                }
-            end,
+            format_on_save = false,
             formatters_by_ft = {
                 lua = { "stylua" },
                 -- Conform can also run multiple formatters sequentially
@@ -797,7 +819,6 @@ require("lazy").setup({
             -- See `:help cmp`
             local cmp = require "cmp"
             local luasnip = require "luasnip"
-            require("luasnip/loaders/from_vscode").lazy_load()
 
             luasnip.config.setup {}
 
@@ -947,14 +968,6 @@ require("lazy").setup({
                 },
             }
 
-            -- Colors
-            vim.api.nvim_set_hl(0, "CmpItemKind", { bold = true })
-            vim.api.nvim_set_hl(0, "CmpItemAbbr", { link = "CursorLineNr" })
-            vim.api.nvim_set_hl(0, "CmpItemKindText", { link = "CursorLineNr" })
-
-            vim.api.nvim_set_hl(0, "CmpItemAbbrMatch", { bg = "NONE", fg = "NONE" })
-            vim.api.nvim_set_hl(0, "CmpItemAbbrMatchFuzzy", { link = "CmpIntemAbbrMatch" })
-
             -- vim.api.nvim_set_hl(0, "Pmenu", { bg = "#252526", fg = "#CFCFCF" })
             -- -- gray
             -- vim.api.nvim_set_hl(0, "CmpItemAbbrDeprecated", { bg = "NONE", strikethrough = true, fg = "#808080" })
@@ -974,7 +987,19 @@ require("lazy").setup({
             -- vim.api.nvim_set_hl(0, "CmpItemKindUnit", { link = "CmpItemKindKeyword" })
         end,
     },
+    {
+        "LunarVim/Colorschemes",
+        priority = 1000, -- Make sure to load this before all the other start plugins.
+        init = function()
+            vim.cmd.colorscheme "onedark"
 
+            vim.api.nvim_set_hl(0, "CmpItemKind", { bold = true })
+            vim.api.nvim_set_hl(0, "CmpItemAbbr", { link = "Comment", italic = false })
+            vim.api.nvim_set_hl(0, "CmpItemKindText", { link = "Comment", italic = false })
+            vim.api.nvim_set_hl(0, "CmpItemAbbrMatch", { link = "Comment", italic = false })
+            vim.api.nvim_set_hl(0, "CmpItemAbbrMatchFuzzy", { link = "Comment", italic = false })
+        end,
+    },
     { -- You can easily change to a different colorscheme.
         -- Change the name of the colorscheme plugin below, and then
         -- change the command in the config to whatever the name of that colorscheme is.
@@ -982,13 +1007,18 @@ require("lazy").setup({
         -- If you want to see what colorschemes are already installed, you can use `:Telescope colorscheme`.
         "folke/tokyonight.nvim",
         priority = 1000, -- Make sure to load this before all the other start plugins.
+        enabled = false,
         init = function()
             -- Load the colorscheme here.
             -- Like many other themes, this one has different styles, and you could load
             -- any other, such as 'tokyonight-storm', 'tokyonight-moon', or 'tokyonight-day'.
-            vim.cmd.colorscheme "tokyonight-night"
             -- You can configure highlights by doing something like:
             -- vim.cmd.hi "Comment gui=none"
+            vim.api.nvim_set_hl(0, "CmpItemKind", { bold = true })
+            vim.api.nvim_set_hl(0, "CmpItemAbbr", { link = "CursorLineNr" })
+            vim.api.nvim_set_hl(0, "CmpItemKindText", { link = "CursorLineNr" })
+            vim.api.nvim_set_hl(0, "CmpItemAbbrMatch", { link = "CursorLineNr" })
+            vim.api.nvim_set_hl(0, "CmpItemAbbrMatchFuzzy", { link = "CursorLineNr" })
         end,
         opts = {
             terminal_colors = true,
@@ -1124,29 +1154,6 @@ require("lazy").setup({
     },
     {
         "tikhomirov/vim-glsl",
-        config = function()
-            vim.api.nvim_create_autocmd({ "BufNewFile, BufRead" }, {
-                desc = "Treat shader files using the .glsl extension",
-                pattern = {
-                    "*.glsl",
-                    "*.comp",
-                    "*.vert",
-                    "*.frag",
-                    "*.geom",
-                    "*.tese",
-                    "*.tesc",
-                    "*.mesh",
-                    "*.task",
-                    "*.rgen",
-                    "*.rint",
-                    "*.rmiss",
-                    "*.rahit",
-                    "*.rchit",
-                    "*.rcall",
-                },
-                command = "set ft=glsl",
-            })
-        end,
     },
     {
         "windwp/nvim-autopairs",
@@ -1303,7 +1310,7 @@ require("lazy").setup({
         config = function()
             local nvim_tree = require "nvim-tree"
 
-            nvim_tree.setup {
+            local opts = {
                 auto_reload_on_write = false,
                 disable_netrw = false,
                 hijack_cursor = false,
@@ -1507,14 +1514,88 @@ require("lazy").setup({
                     args = {},
                 },
             }
+
             -- Implicitly update nvim-tree when project module is active
-            -- if lvim.builtin.project.active then
-            --     nvim_tree.setup.respect_buf_cwd = true
-            --     nvim_tree.setup.update_cwd = true
-            --     nvim_tree.setup.update_focused_file.enable = true
-            --     nvim_tree.setup.update_focused_file.update_cwd = true
-            -- end
+            if require("project_nvim").active then
+                opts.respect_buf_cwd = true
+                opts.update_cwd = true
+                opts.update_focused_file.enable = true
+                opts.update_focused_file.update_cwd = true
+            end
+
+            nvim_tree.setup(opts)
         end,
+    },
+    {
+        "akinsho/bufferline.nvim",
+        opts = {
+            options = {
+                numbers = "none", -- | "ordinal" | "buffer_id" | "both" | function({ ordinal, id, lower, raise }): string,
+                close_command = "Bdelete! %d", -- can be a string | function, see "Mouse actions"
+                right_mouse_command = "Bdelete! %d", -- can be a string | function, see "Mouse actions"
+                left_mouse_command = "buffer %d", -- can be a string | function, see "Mouse actions"
+                indicator = {
+                    style = "icon",
+                    icon = "▎",
+                },
+                buffer_close_icon = "",
+                -- buffer_close_icon = '',
+                modified_icon = "●",
+                --close_icon = "",
+                -- close_icon = '',
+                left_trunc_marker = "",
+                right_trunc_marker = "",
+                --- name_formatter can be used to change the buffer's label in the bufferline.
+                --- Please note some names can/will break the
+                --- bufferline so use this at your discretion knowing that it has
+                --- some limitations that will *NOT* be fixed.
+                -- name_formatter = function(buf)  -- buf contains a "name", "path" and "bufnr"
+                --   -- remove extension from markdown files for example
+                --   if buf.name:match('%.md') then
+                --     return vim.fn.fnamemodify(buf.name, ':t:r')
+                --   end
+                -- end,
+                -- max_name_length = 30,
+                -- max_prefix_length = 30, -- prefix used when a buffer is de-duplicated
+                -- tab_size = 21,
+                -- diagnostics = false, -- | "nvim_lsp" | "coc",
+                diagnostics_update_in_insert = false,
+                -- diagnostics_indicator = function(count, level, diagnostics_dict, context)
+                --   return "("..count..")"
+                -- end,
+                -- NOTE: this will be called a lot so don't do any heavy processing here
+                -- custom_filter = function(buf_number)
+                --   -- filter out filetypes you don't want to see
+                --   if vim.bo[buf_number].filetype ~= "<i-dont-want-to-see-this>" then
+                --     return true
+                --   end
+                --   -- filter out by buffer name
+                --   if vim.fn.bufname(buf_number) ~= "<buffer-name-I-dont-want>" then
+                --     return true
+                --   end
+                --   -- filter out based on arbitrary rules
+                --   -- e.g. filter out vim wiki buffer from tabline in your work repo
+                --   if vim.fn.getcwd() == "<work-repo>" and vim.bo[buf_number].filetype ~= "wiki" then
+                --     return true
+                --   end
+                -- end,
+                offsets = { { filetype = "NvimTree", text = "", padding = 1 } },
+                show_buffer_icons = false,
+                show_buffer_close_icons = false,
+                show_close_icon = false,
+                show_tab_indicators = false,
+                persist_buffer_sort = true, -- whether or not custom sorted buffers should persist
+                -- can also be a table containing 2 custom separators
+                -- [focused and unfocused]. eg: { '|', '|' }
+                separator_style = "thin", -- | "thick" | "thin" | { 'any', 'any' },
+                enforce_regular_tabs = true,
+                always_show_bufferline = false,
+                -- sort_by = 'id' | 'extension' | 'relative_directory' | 'directory' | 'tabs' | function(buffer_a, buffer_b)
+                --   -- add custom logic
+                --   return buffer_a.modified > buffer_b.modified
+                -- end
+            },
+        },
     },
     -- {
     -- },
