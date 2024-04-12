@@ -131,6 +131,17 @@ vim.g.neovide_hide_mouse_when_typing = true
 -- vim.g.neovide_scroll_animation_far_lines = 9999
 -- vim.g.neovide_vsync = true
 
+-- [[ Basic Keymaps ]]
+--  See `:help vim.keymap.set()`
+
+local which_key_mappins = {
+    ["<leader>s"] = { name = "[S]earch", _ = "which_key_ignore" },
+    ["<leader>l"] = { name = "[L]SP", _ = "which_key_ignore" },
+    ["<leader>g"] = { name = "[G]it", _ = "which_key_ignore" },
+    -- ["<leader>t"] = { name = "[T]erminal", _ = "which_key_ignore" },
+    ["<leader>T"] = { name = "[T]heme", _ = "which_key_ignore" },
+}
+
 -- Change font size in neovide
 local change_scale_factor = function(delta)
     vim.g.neovide_scale_factor = vim.g.neovide_scale_factor * delta
@@ -150,16 +161,9 @@ vim.keymap.set("n", "<C-ScrollWheelDown>", function()
     change_scale_factor(1 / 1.10)
 end)
 
--- [[ Basic Keymaps ]]
---  See `:help vim.keymap.set()`
-
-local which_key_mappins = {
-    ["<leader>s"] = { name = "[S]earch", _ = "which_key_ignore" },
-    ["<leader>l"] = { name = "[L]SP", _ = "which_key_ignore" },
-    ["<leader>g"] = { name = "[G]it", _ = "which_key_ignore" },
-    -- ["<leader>t"] = { name = "[T]erminal", _ = "which_key_ignore" },
-    ["<leader>T"] = { name = "[T]heme", _ = "which_key_ignore" },
-}
+-- Scrolling
+vim.api.nvim_set_keymap('n', '<C-u>', '<C-u>zz', { noremap = true })
+vim.api.nvim_set_keymap('n', '<C-d>', '<C-d>zz', { noremap = true })
 
 vim.cmd "set whichwrap+=<,>,[,],h,l"
 vim.cmd [[set iskeyword+=-]]
@@ -263,6 +267,7 @@ vim.keymap.set("n", "<leader>c", "<cmd>silent!bd!<CR>", { desc = "Close Buffer" 
 vim.keymap.set("n", "<C-f>", "<cmd>silent!Telescope current_buffer_fuzzy_find<CR>", { desc = "Treesitter symbols" })
 vim.keymap.set("n", "<C-p>", "<cmd>silent!Telescope find_files<CR>", { desc = "Files" })
 vim.keymap.set("n", "<leader>f", "<cmd>silent!Telescope find_files<CR>", { desc = "Files" })
+vim.keymap.set("n", "<leader>r", "<cmd>silent!Telescope resume<CR>", { desc = "Resume" })
 vim.keymap.set("n", "<leader>R", "<cmd>silent!Telescope oldfiles<CR>", { desc = "Recent files" })
 
 vim.keymap.set("n", "<leader>st", "<cmd>silent!Telescope live_grep<CR>", { desc = "Search text" })
@@ -278,6 +283,7 @@ vim.keymap.set("n", "<leader>C", "<cmd>silent!Telescope command_history<CR>", { 
 
 vim.keymap.set("n", "<leader>Tc", "<cmd>silent!Telescope colorscheme<CR>", { desc = "Colorschemes" })
 vim.keymap.set("n", "<leader>Th", "<cmd>silent!Telescope highlights<CR>", { desc = "Highlights" })
+
 
 -- Git
 vim.keymap.set("n", "<leader>gj", "<cmd>lua require 'gitsigns'.next_hunk({navigation_message = false})<CR>", { desc = "Next hunk" })
@@ -1888,15 +1894,15 @@ require("lazy").setup({
                 -- color = { fg = colors.light_violet, gui = "NONE" },
                 -- padding = { left = 0 },
             }
-            ins_left {
-                "diff",
-                diff_color = {
-                    added = { fg = get_color "NvimTreeGitNew" },
-                    modified = { fg = get_color "NvimTreeGitDirty" },
-                    removed = { fg = get_color "NvimTreeGitDeleted" },
-                },
-                symbols = { added = "", modified = "", removed = "" },
-            }
+            -- ins_left {
+            --     "diff",
+            --     diff_color = {
+            --         added = { fg = get_color "NvimTreeGitNew" },
+            --         modified = { fg = get_color "NvimTreeGitDirty" },
+            --         removed = { fg = get_color "NvimTreeGitDeleted" },
+            --     },
+            --     symbols = { added = "", modified = "", removed = "" },
+            -- }
 
             --
             -- Insert mid section. You can make any number of sections in neovim :)
