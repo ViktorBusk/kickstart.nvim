@@ -1744,8 +1744,6 @@ require("lazy").setup({
         config = function()
             local lualine = require "lualine"
             local icons = require "nvim-web-devicons"
-            local git_diff = require "lualine.components.diff"
-            local utils = require "lualine.utils.utils"
 
             local conditions = {
                 hide_in_width = function()
@@ -1881,15 +1879,6 @@ require("lazy").setup({
                 function()
                     return vim.fn.expand "%:t"
                 end,
-                color = function()
-                    local git_changes = git_diff.update_status(utils.is_focused())
-
-                    if git_changes ~= nil then
-                        return { fg = get_color "NvimTreeGitDirty" }
-                    else
-                        return { fg = default_color }
-                    end
-                end,
                 padding = { left = -1, right = 1 },
             }
 
@@ -1899,6 +1888,16 @@ require("lazy").setup({
                 -- color = { fg = colors.light_violet, gui = "NONE" },
                 -- padding = { left = 0 },
             }
+            ins_left {
+                "diff",
+                diff_color = {
+                    added = { fg = get_color "NvimTreeGitNew" },
+                    modified = { fg = get_color "NvimTreeGitDirty" },
+                    removed = { fg = get_color "NvimTreeGitDeleted" },
+                },
+                symbols = { added = "", modified = "", removed = "" },
+            }
+
             --
             -- Insert mid section. You can make any number of sections in neovim :)
             -- for lualine it's any number greater then 2
