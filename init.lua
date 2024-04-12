@@ -122,7 +122,7 @@ vim.g.neovide_floating_opacity = 0.4
 vim.g.neovide_floating_blur = true
 vim.g.neovide_remember_window_size = true
 vim.g.neovide_scale_factor = 1.5
-vim.g.neovide_scroll_animation_length = 0.25
+vim.g.neovide_scroll_animation_length = 0.30
 vim.g.neovide_cursor_animate_command_line = false
 -- vim.cmd [[ set guicursor=i:ver25-blinkwait10-blinkon500-blinkoff500 ]]
 vim.cmd [[set mousescroll=ver:5,hor:5]]
@@ -162,8 +162,8 @@ vim.keymap.set("n", "<C-ScrollWheelDown>", function()
 end)
 
 -- Scrolling
-vim.api.nvim_set_keymap('n', '<C-u>', '<C-u>zz', { noremap = true })
-vim.api.nvim_set_keymap('n', '<C-d>', '<C-d>zz', { noremap = true })
+vim.api.nvim_set_keymap("n", "<C-u>", "<C-u>zz", { noremap = true })
+vim.api.nvim_set_keymap("n", "<C-d>", "<C-d>zz", { noremap = true })
 
 vim.cmd "set whichwrap+=<,>,[,],h,l"
 vim.cmd [[set iskeyword+=-]]
@@ -284,7 +284,6 @@ vim.keymap.set("n", "<leader>C", "<cmd>silent!Telescope command_history<CR>", { 
 vim.keymap.set("n", "<leader>Tc", "<cmd>silent!Telescope colorscheme<CR>", { desc = "Colorschemes" })
 vim.keymap.set("n", "<leader>Th", "<cmd>silent!Telescope highlights<CR>", { desc = "Highlights" })
 
-
 -- Git
 vim.keymap.set("n", "<leader>gj", "<cmd>lua require 'gitsigns'.next_hunk({navigation_message = false})<CR>", { desc = "Next hunk" })
 vim.keymap.set("n", "<leader>gk", "<cmd>lua require 'gitsigns'.prev_hunk({navigation_message = false})<CR>", { desc = "Prev hunk" })
@@ -316,13 +315,17 @@ local function keymaps_lsp(event)
     map("<leader>ld", require("telescope.builtin").lsp_type_definitions, "Type definition")
     map("<leader>ls", require("telescope.builtin").lsp_document_symbols, "Document symbols")
     map("<leader>lS", require("telescope.builtin").lsp_dynamic_workspace_symbols, "Workspace symbols")
-    map("<leader>lr", vim.lsp.buf.rename, "Reame")
     map("<leader>la", vim.lsp.buf.code_action, "Action")
+
     map("K", vim.lsp.buf.hover, "Hover hocumentation")
     -- WARN: This is not Goto Definition, this is Goto Declaration.
     --  For example, in C this would take you to the header.
     map("gD", vim.lsp.buf.declaration, "Goto declaration")
     map("<C-i>", vim.lsp.buf.signature_help, "Signatre help")
+
+    vim.keymap.set("n", "<leader>lr", function()
+        return ":IncRename " -- .. vim.fn.expand "<cword>"
+    end, { expr = true, desc = { "Rename" } })
 end
 
 -- [[ Basic Autocommands ]]
@@ -599,6 +602,32 @@ require("lazy").setup({
                 "nvim-tree/nvim-web-devicons",
                 enabled = vim.g.have_nerd_font,
                 lazy = true,
+                opts = {
+                    override_by_filename = {
+                        [".clang-format"] = {
+                            icon = "",
+                            color = "#801b37",
+                            name = "nf-fa-dragon",
+                        },
+                    },
+                    override_by_extension = {
+                        ["sln"] = {
+                            icon = "󰘐",
+                            color = "#B75FF4",
+                            name = "nf-md-microsoft_visual_studio",
+                        },
+                        ["vcxproj"] = {
+                            icon = "󰘐",
+                            color = "#B75FF4",
+                            name = "nf-md-microsoft_visual_studio",
+                        },
+                        ["vcxproj.user"] = {
+                            icon = "󰘐",
+                            color = "#B75FF4",
+                            name = "nf-md-microsoft_visual_studio",
+                        },
+                    },
+                },
                 -- HACK: Latest release give errors on windows
                 commit = "5efb8bd",
             },
@@ -1963,6 +1992,10 @@ require("lazy").setup({
             -- Now don't forget to initialize lualine
             lualine.setup(config)
         end,
+    },
+    {
+        "smjonas/inc-rename.nvim",
+        opts = {},
     },
 }, {
     ui = {
