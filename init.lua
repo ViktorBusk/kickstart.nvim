@@ -330,6 +330,44 @@ end
 
 -- [[ Basic Autocommands ]]
 --  See `:help lua-guide-autocommands`
+
+-- Global variable to store whether the file has been modified
+local dirty_file_cache = {}
+local function git_current_file_modified()
+    return dirty_file_cache[vim.fn.expand "%:t"] ~= nil
+end
+
+-- Function to check Git status for the current file (not very fast but async)
+function CheckGitFileStatus()
+    local filename = vim.fn.expand "%:t"
+    local was_dirty = false
+
+    local git_cmd = string.format("git -C %s status --porcelain %s", vim.fn.shellescape(vim.fn.expand "%:p:h"), vim.fn.shellescape(filename))
+    vim.fn.jobstart(git_cmd, {
+        -- Of the command outputs something we know that the current file has been modified
+        on_stdout = function(_, data)
+            for k, v in pairs(data) do
+                if string.len(v) > 0 then
+                    dirty_file_cache[filename] = true
+                    was_dirty = true
+                    return
+                end
+            end
+        end,
+        on_stderr = function(_, _)
+            if not was_dirty then
+                if dirty_file_cache[filename] ~= nil then
+                    dirty_file_cache[filename] = nil
+                end
+            end
+        end,
+    })
+end
+
+-- function CheckGitBranchStatus()
+--     local project_name =
+-- end
+
 vim.cmd [[
      augroup _general_settings
          autocmd!
@@ -343,7 +381,8 @@ vim.cmd [[
          autocmd!
          autocmd FileType gitcommit setlocal wrap
          autocmd FileType gitcommit setlocal spell
-     augroup end
+         autocmd BufWinEnter,FocusGained,BufWritePost * :lua CheckGitFileStatus()
+    augroup end
 
      augroup _markdown
          autocmd!
@@ -364,6 +403,11 @@ vim.cmd [[
      augroup _glsl
         autocmd!
         autocmd! BufNewFile,BufRead *.vert,*.frag, *.geom, *.comp, set ft=glsl
+     augroup end
+
+     augroup _colorizer
+        autocmd!
+        autocmd! TextChanged * ColorizerReloadAllBuffers
      augroup end
  ]]
 
@@ -1779,6 +1823,7 @@ require("lazy").setup({
         config = function()
             local lualine = require "lualine"
             local icons = require "nvim-web-devicons"
+            local nvimtree = require "nvim-tree.api"
 
             local conditions = {
                 hide_in_width = function()
@@ -1901,7 +1946,12 @@ require("lazy").setup({
                     local current_file = vim.fn.expand "%:t"
                     local extension = vim.fn.expand "%:e"
                     local icon, _ = icons.get_icon(current_file, extension)
-                    return icon
+
+                    if icon == nil then
+                        return ""
+                    else
+                        return icon
+                    end
                 end,
                 color = function()
                     local current_file = vim.fn.expand "%:t"
@@ -1913,6 +1963,13 @@ require("lazy").setup({
             ins_left {
                 function()
                     return vim.fn.expand "%:t"
+                end,
+                color = function()
+                    if git_current_file_modified() then
+                        return { fg = get_color "NvimTreeGitDirty" }
+                    else
+                        return { fg = default_color }
+                    end
                 end,
                 padding = { left = -1, right = 1 },
             }
@@ -2018,6 +2075,22 @@ require("lazy").setup({
         },
     },
 })
+
+-- Dumbs a table for debugging
+local function dump(o)
+    if type(o) == "table" then
+        local s = "{ "
+        for k, v in pairs(o) do
+            if type(k) ~= "number" then
+                k = '"' .. k .. '"'
+            end
+            s = s .. "[" .. k .. "] = " .. dump(v) .. ","
+        end
+        return s .. "} "
+    else
+        return tostring(o)
+    end
+end
 
 -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et
