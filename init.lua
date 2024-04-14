@@ -223,6 +223,12 @@ vim.keymap.set("n", "<leader>L", "<cmd>silent!Lazy show<CR>", { desc = "Packages
 -- Nvim tree
 vim.keymap.set("n", "<leader>e", "<cmd>silent!NvimTreeToggle<CR>", { desc = "Explorer" })
 
+-- TODO: Linux
+-- Open system explorer
+if vim.fn.has "win32" == 1 then
+    vim.keymap.set("n", "<leader>E", "<cmd>silent!!explorer .<CR>", { desc = "System explorer" })
+end
+
 local function keymaps_nvim_tree(api, opts)
     vim.keymap.set("n", "l", api.node.open.edit, opts "Open")
     vim.keymap.set("n", "o", api.node.open.edit, opts "Open")
@@ -276,7 +282,7 @@ vim.keymap.set("n", "<leader>sw", "<cmd>silent!Telescope grep_string<CR>", { des
 
 vim.keymap.set("n", "<leader>P", "<cmd>silent!Telescope projects<CR>", { desc = "Projects" })
 vim.keymap.set("n", "<leader><leader>", "<cmd>silent!Telescope buffers<CR>", { desc = "Buffers" })
-vim.keymap.set("n", "<leader>T", "<cmd>silent!Telescope spell_suggest<CR>", { desc = "Spell suggestions" })
+vim.keymap.set("n", "<leader>S", "<cmd>silent!Telescope spell_suggest<CR>", { desc = "Spell suggestions" })
 vim.keymap.set("n", "<leader>j", "<cmd>silent!Telescope jumplist<CR>", { desc = "Jumplist" })
 vim.keymap.set("n", "<leader>k", "<cmd>silent!Telescope keymaps<CR>", { desc = "Keymaps" })
 vim.keymap.set("n", "<leader>C", "<cmd>silent!Telescope command_history<CR>", { desc = "Command history" })
@@ -331,43 +337,7 @@ end
 -- [[ Basic Autocommands ]]
 --  See `:help lua-guide-autocommands`
 
--- Global variable to store whether the file has been modified
-local dirty_file_cache = {}
-local function git_current_file_modified()
-    return dirty_file_cache[vim.fn.expand "%:t"] ~= nil
-end
-
--- Function to check Git status for the current file (not very fast but async)
-function CheckGitFileStatus()
-    local filename = vim.fn.expand "%:t"
-    local was_dirty = false
-
-    local git_cmd = string.format("git -C %s status --porcelain %s", vim.fn.shellescape(vim.fn.expand "%:p:h"), vim.fn.shellescape(filename))
-    vim.fn.jobstart(git_cmd, {
-        -- Of the command outputs something we know that the current file has been modified
-        on_stdout = function(_, data)
-            for k, v in pairs(data) do
-                if string.len(v) > 0 then
-                    dirty_file_cache[filename] = true
-                    was_dirty = true
-                    return
-                end
-            end
-        end,
-        on_stderr = function(_, _)
-            if not was_dirty then
-                if dirty_file_cache[filename] ~= nil then
-                    dirty_file_cache[filename] = nil
-                end
-            end
-        end,
-    })
-end
-
--- function CheckGitBranchStatus()
---     local project_name =
--- end
-
+-- autocmd BufWinEnter,FocusGained,BufWritePost * :lua CheckGitFileStatus()
 vim.cmd [[
      augroup _general_settings
          autocmd!
@@ -381,7 +351,6 @@ vim.cmd [[
          autocmd!
          autocmd FileType gitcommit setlocal wrap
          autocmd FileType gitcommit setlocal spell
-         autocmd BufWinEnter,FocusGained,BufWritePost * :lua CheckGitFileStatus()
     augroup end
 
      augroup _markdown
@@ -402,14 +371,76 @@ vim.cmd [[
 
      augroup _glsl
         autocmd!
-        autocmd! BufNewFile,BufRead *.vert,*.frag, *.geom, *.comp, set ft=glsl
+        autocmd BufNewFile,BufReadPost *.vert,*.frag,*.geom,*.comp :set ft=glsl
+        autocmd BufWritePost,BufWinEnter *.vert,*.frag,*.geom,*.comp :lua DiagnosticsGLSLUpdate()
+        autocmd TextChangedI *.vert,*.frag,*.geom,*.comp :lua DiagnosticsGLSLClear()
      augroup end
 
+     " PERF: This might be costly, need to monitor this for the future
      augroup _colorizer
         autocmd!
-        autocmd! TextChanged * ColorizerReloadAllBuffers
+        autocmd TextChangedI * ColorizerReloadAllBuffers
      augroup end
  ]]
+
+-- Custom diagnostics in GLSL from glslangValidator
+local glslang_namespace = vim.api.nvim_create_namespace "glslangValidator"
+
+function DiagnosticsGLSLClear()
+    vim.diagnostic.reset(glslang_namespace, 0)
+end
+
+function DiagnosticsGLSLUpdate()
+    local absolute_file_path = vim.fn.expand "%:p"
+    local glslangValidator_path = "glslangValidator"
+
+    local cmd = string.format('%s "%s"', glslangValidator_path, absolute_file_path)
+
+    vim.diagnostic.reset(glslang_namespace, 0)
+    vim.fn.jobstart(cmd, {
+        on_stdout = function(_, data)
+            if data[2] ~= nil then
+                local delimiter = ":"
+                local parts = {}
+
+                -- Iterate over each part of the string separated by the delimiter
+                for part in string.gmatch(data[2], "[^" .. delimiter .. "]+") do
+                    table.insert(parts, part)
+                end
+
+                -- Since glslangValidator always outputs column 0 just mark the whole line as an error
+                local valdidator_severity = parts[1]
+                local line_number = tonumber(parts[3]) - 1
+                local line_content = vim.api.nvim_buf_get_lines(0, line_number, line_number + 1, false)[1]
+
+                local start_col = (line_content:find "%S" - 1 or #line_content + 1)
+                local end_col = #line_content - ((line_content:reverse():find "%S" or #line_content) - 1)
+
+                local msg = parts[5]:sub(1, -2) -- Remove wierd newline character
+                msg = msg:gsub("^%s*(.-)%s*$", "%1") -- Trim whitespaces
+                msg = string.format(" glslangValidator: %s ", msg) -- Add surrounding spaces
+
+                local severity_conversion_table = {
+                    ERROR = vim.diagnostic.severity.ERROR,
+                    WARNING = vim.diagnostic.severity.WARN,
+                    INFO = vim.diagnostic.severity.INFO,
+                    NOTE = vim.diagnostic.severity.HINT,
+                }
+
+                local opts = {
+                    lnum = line_number,
+                    col = start_col,
+                    message = msg,
+                    severity = severity_conversion_table[valdidator_severity] or vim.diagnostic.severity.ERROR,
+                    end_lnum = line_number,
+                    end_col = end_col,
+                }
+
+                vim.diagnostic.set(glslang_namespace, 0, { opts })
+            end
+        end,
+    })
+end
 
 -- Auto close nvim-tree when its the last buffer
 vim.api.nvim_create_autocmd("QuitPre", {
@@ -1191,7 +1222,7 @@ require("lazy").setup({
 
                         vim_item.abbr = clamp(vim_item.abbr, 30)
                         vim_item.abbr = vim_item.abbr .. "      " -- Add some padding
-                        vim_item.menu = clamp(entry:get_completion_item().detail, 20)
+                        vim_item.menu = clamp(entry:get_completion_item().detail, 15)
 
                         -- This concatonates the icons with the name of the item kind
                         vim_item.kind = string.format("%s", kind_icons[vim_item.kind])
@@ -1257,45 +1288,45 @@ require("lazy").setup({
             vim.cmd.colorscheme "gruv-vsassist"
         end,
     },
-    {
-        "wuelnerdotexe/vim-enfocado",
-        priority = 1000,
-        enabled = false,
-        init = function()
-            vim.g.enfocado_style = "nature"
-            vim.cmd.colorscheme "enfocado"
-        end,
-    },
-    {
-        "folke/tokyonight.nvim",
-        priority = 1000, -- Make sure to load this before all the other start plugins.
-        enabled = false,
-        init = function()
-            -- You can configure highlights by doing something like:
-            vim.cmd.colorscheme "tokyonight"
-
-            vim.cmd.hi "Comment gui=none"
-            vim.api.nvim_set_hl(0, "CmpItemKind", { bold = true })
-            vim.api.nvim_set_hl(0, "CmpItemAbbr", { link = "CursorLineNr" })
-            vim.api.nvim_set_hl(0, "CmpItemKindText", { link = "CursorLineNr" })
-            vim.api.nvim_set_hl(0, "CmpItemAbbrMatch", { link = "CursorLineNr" })
-            vim.api.nvim_set_hl(0, "CmpItemAbbrMatchFuzzy", { link = "CursorLineNr" })
-        end,
-        opts = {
-            terminal_colors = true,
-            styles = {
-                -- Style to be applied to different syntax groups
-                -- Value is any valid attr-list value for `:help nvim_set_hl`
-                comments = { italic = false },
-                keywords = { italic = false },
-                functions = {},
-                variables = {},
-                -- Background styles. Can be "dark", "transparent" or "normal"
-                sidebars = "dark", -- style for sidebars, see below
-                floats = "dark", -- style for floating windows
-            },
-        },
-    },
+    -- {
+    --     "wuelnerdotexe/vim-enfocado",
+    --     priority = 1000,
+    --     enabled = false,
+    --     init = function()
+    --         vim.g.enfocado_style = "nature"
+    --         vim.cmd.colorscheme "enfocado"
+    --     end,
+    -- },
+    -- {
+    --     "folke/tokyonight.nvim",
+    --     priority = 1000, -- Make sure to load this before all the other start plugins.
+    --     enabled = false,
+    --     init = function()
+    --         -- You can configure highlights by doing something like:
+    --         vim.cmd.colorscheme "tokyonight"
+    --
+    --         vim.cmd.hi "Comment gui=none"
+    --         vim.api.nvim_set_hl(0, "CmpItemKind", { bold = true })
+    --         vim.api.nvim_set_hl(0, "CmpItemAbbr", { link = "CursorLineNr" })
+    --         vim.api.nvim_set_hl(0, "CmpItemKindText", { link = "CursorLineNr" })
+    --         vim.api.nvim_set_hl(0, "CmpItemAbbrMatch", { link = "CursorLineNr" })
+    --         vim.api.nvim_set_hl(0, "CmpItemAbbrMatchFuzzy", { link = "CursorLineNr" })
+    --     end,
+    --     opts = {
+    --         terminal_colors = true,
+    --         styles = {
+    --             -- Style to be applied to different syntax groups
+    --             -- Value is any valid attr-list value for `:help nvim_set_hl`
+    --             comments = { italic = false },
+    --             keywords = { italic = false },
+    --             functions = {},
+    --             variables = {},
+    --             -- Background styles. Can be "dark", "transparent" or "normal"
+    --             sidebars = "dark", -- style for sidebars, see below
+    --             floats = "dark", -- style for floating windows
+    --         },
+    --     },
+    -- },
 
     -- Highlight todo, notes, etc in comments
     {
@@ -1823,7 +1854,6 @@ require("lazy").setup({
         config = function()
             local lualine = require "lualine"
             local icons = require "nvim-web-devicons"
-            local nvimtree = require "nvim-tree.api"
 
             local conditions = {
                 hide_in_width = function()
@@ -1964,13 +1994,13 @@ require("lazy").setup({
                 function()
                     return vim.fn.expand "%:t"
                 end,
-                color = function()
-                    if git_current_file_modified() then
-                        return { fg = get_color "NvimTreeGitDirty" }
-                    else
-                        return { fg = default_color }
-                    end
-                end,
+                -- color = function()
+                --     if git_current_file_modified() then
+                --         return { fg = get_color "NvimTreeGitDirty" }
+                --     else
+                --         return { fg = default_color }
+                --     end
+                -- end,
                 padding = { left = -1, right = 1 },
             }
 
