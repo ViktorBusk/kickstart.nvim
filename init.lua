@@ -262,27 +262,9 @@ vim.keymap.set(
     { desc = "Treesitter toggle" }
 )
 
--- Center window when scrolling
--- vim.keymap.set("n", "<C-u>", )
-
 -- Buffers
-local function smart_quit()
-    local bufnr = vim.api.nvim_get_current_buf()
-    local modified = vim.api.nvim_buf_get_option(bufnr, "modified")
-    if modified then
-        vim.ui.input({
-            prompt = "You have unsaved changes. Quit anyway? (y/n) ",
-        }, function(input)
-            if input == "y" then
-                vim.cmd "q!"
-            end
-        end)
-    else
-        vim.cmd "q!"
-    end
-end
 vim.keymap.set("n", "<leader>w", "<cmd>w!<CR>", { desc = "Save" })
-vim.keymap.set("n", "<leader>q", smart_quit, { desc = "Quit" })
+vim.keymap.set("n", "<leader>q", "<cmd>q<CR>", { desc = "Quit" })
 vim.keymap.set("n", "<leader>c", "<cmd>silent!bd!<CR>", { desc = "Close Buffer" })
 
 -- Telescope
@@ -389,212 +371,90 @@ vim.cmd [[
      augroup _glsl
         autocmd!
         autocmd BufNewFile,BufReadPost,BufWinEnter,BufNewFile *.vert,*.frag,*.geom,*.comp :set ft=glsl
-        autocmd BufWinEnter,BufEnter *.vert,*.frag,*.geom,*.comp lua DiagnosticsGlslWatch()
+        autocmd BufWinEnter,BufEnter,TextChanged,InsertLeavePre * lua if vim.bo.filetype == 'glsl' then DiagnosticsGlslWatch() end
+        autocmd BufWinEnter,BufEnter * lua if vim.bo.filetype ~= 'glsl' then DiagnosticsGlslClear() end
      augroup end
 
-     augroup _colorizer
-        autocmd!
-        " FIXME: The excluded files are defined on two separate places
-        autocmd TextChanged,TextChangedI *[^.cpp,.c,.glsl] ColorizerAttachToBuffer  
-     augroup end
+     " augroup _colorizer
+     "    autocmd!
+     "    " PERF: The excluded files are defined on two separate place
+     "    autocmd TextChanged,TextChangedI *[^.cpp,.c,.glsl] ColorizerAttachToBuffer
+     " augroup end
  ]]
 
-local glslang_timer = vim.loop.new_timer()
 local glslang_namespace = vim.api.nvim_create_namespace "glslangValidator"
+local channel_id = nil
 
-function DiagnosticsGlslStop()
+function DiagnosticsGlslClear()
     vim.diagnostic.reset(glslang_namespace, 0)
 end
 
 function DiagnosticsGlslWatch()
-    local glslang_job_id = nil
-    local iterations_without_stdout = 0
+    local glslangValidator_path = "glslangValidator.exe"
+    local shader_stage = vim.fn.expand "%:e" -- NOTE: File format must be the same as the shader stage
+    local buffer_content = vim.api.nvim_buf_get_lines(0, 0, -1, false)
 
-    -- Waits 100ms, then repeats every 300 until timer:close().
-    -- print "TIMER START"
-    glslang_timer:start(
-        100,
-        300,
-        vim.schedule_wrap(function()
-            -- Kill previous job if not finished
-            if glslang_job_id then
-                vim.fn.jobstop(glslang_job_id)
+    local cmd = string.format("%s --stdin -S %s ", glslangValidator_path, shader_stage)
+
+    if channel_id then
+        vim.fn.jobstop(channel_id)
+    end
+
+    channel_id = vim.fn.jobstart(cmd, {
+        stdin = "pipe",
+        on_stdout = function(_, data)
+            if #data[1] > 0 and #data[2] > 0 then
+                local delimiter = ":"
+                local parts = {}
+
+                -- Iterate over each part of the string separated by the delimiter
+                for part in string.gmatch(data[2], "[^" .. delimiter .. "]+") do
+                    table.insert(parts, part)
+                end
+
+                local opts = {}
+                --  Try parse the string
+                local parse_successful, _ = pcall(function()
+                    -- Since glslangValidator always outputs column 0 just mark the whole line as an error
+                    local valdidator_severity = parts[1]
+                    local line_number = tonumber(parts[3]) - 1
+                    local line_content = vim.api.nvim_buf_get_lines(0, line_number, line_number + 1, false)[1]
+
+                    local start_col = (line_content:find "%S" - 1 or #line_content + 1)
+                    local end_col = #line_content - ((line_content:reverse():find "%S" or #line_content) - 1)
+
+                    local msg = parts[5]:sub(1, -2) -- Remove wierd newline character
+                    msg = msg:gsub("^%s*(.-)%s*$", "%1") -- Trim whitespaces
+                    msg = string.format(" glslangValidator: %s ", msg) -- Add surrounding spaces
+
+                    local severity_conversion_table = {
+                        ERROR = vim.diagnostic.severity.ERROR,
+                        WARNING = vim.diagnostic.severity.WARN,
+                        INFO = vim.diagnostic.severity.INFO,
+                        NOTE = vim.diagnostic.severity.HINT,
+                    }
+
+                    opts = {
+                        lnum = line_number,
+                        col = start_col,
+                        message = msg,
+                        severity = severity_conversion_table[valdidator_severity] or vim.diagnostic.severity.ERROR,
+                        end_lnum = line_number,
+                        end_col = end_col,
+                    }
+                end)
+
+                if parse_successful and vim.bo.filetype == "glsl" then
+                    vim.diagnostic.reset(glslang_namespace, 0)
+                    vim.diagnostic.set(glslang_namespace, 0, { opts })
+                end
             end
+        end,
+    })
 
-            -- Clear previous diagnostic if we are in insert, or if we stdout stopped providing
-            if vim.fn.mode() == "i" or iterations_without_stdout >= 1 then
-                vim.diagnostic.reset(glslang_namespace, 0)
-            end
-
-            local glslangValidator_path = "glslangValidator"
-            local file_path = vim.fn.expand "%:p"
-            local shader_stage = vim.fn.expand "%:e" -- NOTE: File format must be the same as the shader stage
-            local buffer_content = vim.api.nvim_buf_get_lines(0, 0, -1, false)
-
-            local std_output = false
-            local opts = {}
-
-            local cmd = string.format("%s --stdin -S %s ", glslangValidator_path, shader_stage)
-
-            glslang_job_id = vim.fn.jobstart(cmd, {
-                stdin = "pipe",
-                -- stdout_bufferd = true,
-                -- stdin_bufferd = true,
-                on_stdout = function(_, data)
-                    -- glslangValidator first outputs the file on line 1 and the first error on line 2
-                    -- If there is output on the first line, then there should be no problem with the file
-                    if #data[1] > 0 and data[2] ~= nil then
-                        -- print(dump(data))
-                        local delimiter = ":"
-                        local parts = {}
-
-                        -- Iterate over each part of the string separated by the delimiter
-                        for part in string.gmatch(data[2], "[^" .. delimiter .. "]+") do
-                            table.insert(parts, part)
-                        end
-
-                        --  Try parse the string
-                        local parse_status, _ = pcall(function()
-                            -- Since glslangValidator always outputs column 0 just mark the whole line as an error
-                            local valdidator_severity = parts[1]
-                            local line_number = tonumber(parts[3]) - 1
-                            local line_content = vim.api.nvim_buf_get_lines(0, line_number, line_number + 1, false)[1]
-
-                            local start_col = (line_content:find "%S" - 1 or #line_content + 1)
-                            local end_col = #line_content - ((line_content:reverse():find "%S" or #line_content) - 1)
-
-                            local msg = parts[5]:sub(1, -2) -- Remove wierd newline character
-                            msg = msg:gsub("^%s*(.-)%s*$", "%1") -- Trim whitespaces
-                            msg = string.format(" glslangValidator: %s ", msg) -- Add surrounding spaces
-
-                            local severity_conversion_table = {
-                                ERROR = vim.diagnostic.severity.ERROR,
-                                WARNING = vim.diagnostic.severity.WARN,
-                                INFO = vim.diagnostic.severity.INFO,
-                                NOTE = vim.diagnostic.severity.HINT,
-                            }
-
-                            opts = {
-                                lnum = line_number,
-                                col = start_col,
-                                message = msg,
-                                severity = severity_conversion_table[valdidator_severity] or vim.diagnostic.severity.ERROR,
-                                end_lnum = line_number,
-                                end_col = end_col,
-                            }
-                        end)
-
-                        std_output = parse_status
-                    end
-                end,
-                on_exit = function(_, data)
-                    vim.fn.chanclose(glslang_job_id, "stdin")
-                    -- Update diagnostics if not in insert and make the file was not switched
-                    if vim.bo.filetype ~= "glsl" then
-                        vim.diagnostic.reset(glslang_namespace, 0)
-                        glslang_timer:stop()
-                        return
-                    end
-
-                    if std_output then
-                        iterations_without_stdout = 0
-                        vim.diagnostic.reset(glslang_namespace, 0)
-                        vim.diagnostic.set(glslang_namespace, 0, { opts })
-                        -- print("STDOUPUT: ", glslang_job_id)
-                    else
-                        iterations_without_stdout = iterations_without_stdout + 1
-                    end
-                end,
-            })
-
-            -- Pass buffer content to the job through the pipe
-            vim.fn.chansend(glslang_job_id, buffer_content)
-        end)
-    )
+    vim.fn.chansend(channel_id, buffer_content)
+    vim.fn.chanclose(channel_id, "stdin")
 end
-
--- Job pool
--- local glslang_jobs = {}
--- local num_concurrent_jobs = 2
---
--- function DiagnosticsGLSLUpdate()
---     -- Ensure correct filetype
---     if vim.bo.filetype ~= "glsl" then
---         return
---     end
---
---     -- If there's a previous job, stop it
---     if glslang_job_id then
---         vim.diagnostic.reset(glslang_namespace, 0)
---         vim.fn.jobstop(glslang_job_id)
---     end
---
---     -- Check if there running jobs
---     if #glslang_jobs > num_concurrent_jobs then
---         return
---     end
---
---     local glslangValidator_path = "glslangValidator"
---     local shader_stage = vim.fn.expand "%:e" -- NOTE: File format must be the same as the shader stage
---     local buffer_content = vim.api.nvim_buf_get_lines(0, 0, -1, false)
---
---     local cmd = string.format("%s --stdin -S %s ", glslangValidator_path, shader_stage)
---
---     glslang_job_id = vim.fn.jobstart(cmd, {
---         stdin = "pipe",
---         stdout_bufferd = true,
---         on_stdout = function(_, data)
---             if #data[1] > 0 and data[2] then
---                 local delimiter = ":"
---                 local parts = {}
---
---                 -- Iterate over each part of the string separated by the delimiter
---                 for part in string.gmatch(data[2], "[^" .. delimiter .. "]+") do
---                     table.insert(parts, part)
---                 end
---
---                 -- Since glslangValidator always outputs column 0 just mark the whole line as an error
---                 local valdidator_severity = parts[1]
---                 local line_number = tonumber(parts[3]) - 1
---                 local line_content = vim.api.nvim_buf_get_lines(0, line_number, line_number + 1, false)[1]
---
---                 local start_col = (line_content:find "%S" - 1 or #line_content + 1)
---                 local end_col = #line_content - ((line_content:reverse():find "%S" or #line_content) - 1)
---
---                 local msg = parts[5]:sub(1, -2) -- Remove wierd newline character
---                 msg = msg:gsub("^%s*(.-)%s*$", "%1") -- Trim whitespaces
---                 msg = string.format(" glslangValidator: %s ", msg) -- Add surrounding spaces
---
---                 local severity_conversion_table = {
---                     ERROR = vim.diagnostic.severity.ERROR,
---                     WARNING = vim.diagnostic.severity.WARN,
---                     INFO = vim.diagnostic.severity.INFO,
---                     NOTE = vim.diagnostic.severity.HINT,
---                 }
---
---                 local opts = {
---                     lnum = line_number,
---                     col = start_col,
---                     message = msg,
---                     severity = severity_conversion_table[valdidator_severity] or vim.diagnostic.severity.ERROR,
---                     end_lnum = line_number,
---                     end_col = end_col,
---                 }
---
---                 -- Update diagnostics
---                 vim.diagnostic.reset(glslang_namespace, 0)
---                 vim.diagnostic.set(glslang_namespace, 0, { opts })
---             end
---         end,
---         on_exit = function(_, data)
---             vim.fn.chanclose(glslang_job_id, "stdin")
---             glslang_job_id = nil
---         end,
---     })
---
---     -- Pass buffer content to the job through the pipe
---     vim.fn.chansend(glslang_job_id, buffer_content)
--- end
 
 -- Auto close nvim-tree when its the last buffer
 vim.api.nvim_create_autocmd("QuitPre", {
