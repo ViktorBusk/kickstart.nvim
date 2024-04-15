@@ -22,6 +22,22 @@ if vim.fn.has "win32" == 1 then
     }
 end
 
+-- Dumbs a table for debugging
+local function dump(o)
+    if type(o) == "table" then
+        local s = "{ "
+        for k, v in pairs(o) do
+            if type(k) ~= "number" then
+                k = '"' .. k .. '"'
+            end
+            s = s .. "[" .. k .. "] = " .. dump(v) .. ","
+        end
+        return s .. "} "
+    else
+        return tostring(o)
+    end
+end
+
 -- Set <space> as the leader key
 -- See `:help mapleader`
 --  NOTE: Must happen before plugins are loaded (otherwise wrong leader will be used)
@@ -125,11 +141,11 @@ vim.g.neovide_scale_factor = 1.5
 vim.g.neovide_scroll_animation_length = 0.30
 vim.g.neovide_cursor_animate_command_line = false
 -- vim.cmd [[ set guicursor=i:ver25-blinkwait10-blinkon500-blinkoff500 ]]
-vim.cmd [[set mousescroll=ver:5,hor:5]]
 -- vim.g.neovide_cursor_smooth_blink = false
+vim.cmd [[set mousescroll=ver:5,hor:5]]
 vim.g.neovide_hide_mouse_when_typing = true
 -- vim.g.neovide_scroll_animation_far_lines = 9999
--- vim.g.neovide_vsync = true
+vim.g.neovide_vsync = true
 
 -- [[ Basic Keymaps ]]
 --  See `:help vim.keymap.set()`
@@ -187,7 +203,7 @@ vim.keymap.set("n", "<leader>/", "<cmd>lua require('Comment.api').toggle.linewis
 vim.keymap.set("v", "<leader>/", "<ESC><CMD>lua require('Comment.api').toggle.linewise(vim.fn.visualmode())<CR>", { desc = "Comment lines" })
 
 -- Diagnostic keymaps
-vim.keymap.set("n", "<leader>lp", vim.diagnostic.goto_prev, { desc = "Go to previous diagnostic message" })
+vim.keymap.set("n", "<leader>lk", vim.diagnostic.goto_prev, { desc = "Go to previous diagnostic message" })
 vim.keymap.set("n", "<leader>lj", vim.diagnostic.goto_next, { desc = "Go to next diagnostic message" })
 vim.keymap.set("n", "gl", vim.diagnostic.open_float, { desc = "Show diagnostic error messages" })
 vim.keymap.set("n", "<leader>lq", vim.diagnostic.setloclist, { desc = "Open diagnostic quickfix list" })
@@ -272,7 +288,7 @@ vim.keymap.set("n", "<leader>c", "<cmd>silent!bd!<CR>", { desc = "Close Buffer" 
 -- Telescope
 vim.keymap.set("n", "<C-f>", "<cmd>silent!Telescope current_buffer_fuzzy_find<CR>", { desc = "Treesitter symbols" })
 vim.keymap.set("n", "<C-p>", "<cmd>silent!Telescope find_files<CR>", { desc = "Files" })
-vim.keymap.set("n", "<leader>f", "<cmd>silent!Telescope find_files<CR>", { desc = "Files" })
+vim.keymap.set("n", "<leader>f", "<cmd>silent!Telescope git_files<CR>", { desc = "Files" })
 vim.keymap.set("n", "<leader>r", "<cmd>silent!Telescope resume<CR>", { desc = "Resume" })
 vim.keymap.set("n", "<leader>R", "<cmd>silent!Telescope oldfiles<CR>", { desc = "Recent files" })
 
@@ -301,6 +317,7 @@ vim.keymap.set("n", "<leader>gS", "<cmd>lua require 'gitsigns'.stage_hunk()<CR>"
 vim.keymap.set("n", "<leader>gu", "<cmd>lua require 'gitsigns'.undo_stage_hunk()<CR>", { desc = "Undo stage Hunk" })
 vim.keymap.set("n", "<leader>gd", "<cmd>Gitsigns diffthis HEAD<CR>", { desc = "Diff" })
 
+vim.keymap.set("n", "<leader>gf", "<cmd>silent!Telescope git_files<CR>", { desc = "Files" })
 vim.keymap.set("n", "<leader>gb", "<cmd>silent!Telescope git_branches<CR>", { desc = "Branches" })
 vim.keymap.set("n", "<leader>gc", "<cmd>silent!Telescope git_commits<CR>", { desc = "Commits" })
 vim.keymap.set("n", "<leader>gs", "<cmd>silent!Telescope git_status<CR>", { desc = "Status" })
@@ -371,76 +388,213 @@ vim.cmd [[
 
      augroup _glsl
         autocmd!
-        autocmd BufNewFile,BufReadPost *.vert,*.frag,*.geom,*.comp :set ft=glsl
-        autocmd BufWritePost,BufWinEnter *.vert,*.frag,*.geom,*.comp :lua DiagnosticsGLSLUpdate()
-        autocmd TextChangedI *.vert,*.frag,*.geom,*.comp :lua DiagnosticsGLSLClear()
+        autocmd BufNewFile,BufReadPost,BufWinEnter,BufNewFile *.vert,*.frag,*.geom,*.comp :set ft=glsl
+        autocmd BufWinEnter,BufEnter *.vert,*.frag,*.geom,*.comp lua DiagnosticsGlslWatch()
      augroup end
 
-     " PERF: This might be costly, need to monitor this for the future
      augroup _colorizer
         autocmd!
-        autocmd TextChangedI * ColorizerReloadAllBuffers
+        " FIXME: The excluded files are defined on two separate places
+        autocmd TextChanged,TextChangedI *[^.cpp,.c,.glsl] ColorizerAttachToBuffer  
      augroup end
  ]]
 
--- Custom diagnostics in GLSL from glslangValidator
+local glslang_timer = vim.loop.new_timer()
 local glslang_namespace = vim.api.nvim_create_namespace "glslangValidator"
 
-function DiagnosticsGLSLClear()
+function DiagnosticsGlslStop()
     vim.diagnostic.reset(glslang_namespace, 0)
 end
 
-function DiagnosticsGLSLUpdate()
-    local absolute_file_path = vim.fn.expand "%:p"
-    local glslangValidator_path = "glslangValidator"
+function DiagnosticsGlslWatch()
+    local glslang_job_id = nil
+    local iterations_without_stdout = 0
 
-    local cmd = string.format('%s "%s"', glslangValidator_path, absolute_file_path)
-
-    vim.diagnostic.reset(glslang_namespace, 0)
-    vim.fn.jobstart(cmd, {
-        on_stdout = function(_, data)
-            if data[2] ~= nil then
-                local delimiter = ":"
-                local parts = {}
-
-                -- Iterate over each part of the string separated by the delimiter
-                for part in string.gmatch(data[2], "[^" .. delimiter .. "]+") do
-                    table.insert(parts, part)
-                end
-
-                -- Since glslangValidator always outputs column 0 just mark the whole line as an error
-                local valdidator_severity = parts[1]
-                local line_number = tonumber(parts[3]) - 1
-                local line_content = vim.api.nvim_buf_get_lines(0, line_number, line_number + 1, false)[1]
-
-                local start_col = (line_content:find "%S" - 1 or #line_content + 1)
-                local end_col = #line_content - ((line_content:reverse():find "%S" or #line_content) - 1)
-
-                local msg = parts[5]:sub(1, -2) -- Remove wierd newline character
-                msg = msg:gsub("^%s*(.-)%s*$", "%1") -- Trim whitespaces
-                msg = string.format(" glslangValidator: %s ", msg) -- Add surrounding spaces
-
-                local severity_conversion_table = {
-                    ERROR = vim.diagnostic.severity.ERROR,
-                    WARNING = vim.diagnostic.severity.WARN,
-                    INFO = vim.diagnostic.severity.INFO,
-                    NOTE = vim.diagnostic.severity.HINT,
-                }
-
-                local opts = {
-                    lnum = line_number,
-                    col = start_col,
-                    message = msg,
-                    severity = severity_conversion_table[valdidator_severity] or vim.diagnostic.severity.ERROR,
-                    end_lnum = line_number,
-                    end_col = end_col,
-                }
-
-                vim.diagnostic.set(glslang_namespace, 0, { opts })
+    -- Waits 100ms, then repeats every 300 until timer:close().
+    -- print "TIMER START"
+    glslang_timer:start(
+        100,
+        300,
+        vim.schedule_wrap(function()
+            -- Kill previous job if not finished
+            if glslang_job_id then
+                vim.fn.jobstop(glslang_job_id)
             end
-        end,
-    })
+
+            -- Clear previous diagnostic if we are in insert, or if we stdout stopped providing
+            if vim.fn.mode() == "i" or iterations_without_stdout >= 1 then
+                vim.diagnostic.reset(glslang_namespace, 0)
+            end
+
+            local glslangValidator_path = "glslangValidator"
+            local file_path = vim.fn.expand "%:p"
+            local shader_stage = vim.fn.expand "%:e" -- NOTE: File format must be the same as the shader stage
+            local buffer_content = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+
+            local std_output = false
+            local opts = {}
+
+            local cmd = string.format("%s --stdin -S %s ", glslangValidator_path, shader_stage)
+
+            glslang_job_id = vim.fn.jobstart(cmd, {
+                stdin = "pipe",
+                -- stdout_bufferd = true,
+                -- stdin_bufferd = true,
+                on_stdout = function(_, data)
+                    -- glslangValidator first outputs the file on line 1 and the first error on line 2
+                    -- If there is output on the first line, then there should be no problem with the file
+                    if #data[1] > 0 and data[2] ~= nil then
+                        -- print(dump(data))
+                        local delimiter = ":"
+                        local parts = {}
+
+                        -- Iterate over each part of the string separated by the delimiter
+                        for part in string.gmatch(data[2], "[^" .. delimiter .. "]+") do
+                            table.insert(parts, part)
+                        end
+
+                        --  Try parse the string
+                        local parse_status, _ = pcall(function()
+                            -- Since glslangValidator always outputs column 0 just mark the whole line as an error
+                            local valdidator_severity = parts[1]
+                            local line_number = tonumber(parts[3]) - 1
+                            local line_content = vim.api.nvim_buf_get_lines(0, line_number, line_number + 1, false)[1]
+
+                            local start_col = (line_content:find "%S" - 1 or #line_content + 1)
+                            local end_col = #line_content - ((line_content:reverse():find "%S" or #line_content) - 1)
+
+                            local msg = parts[5]:sub(1, -2) -- Remove wierd newline character
+                            msg = msg:gsub("^%s*(.-)%s*$", "%1") -- Trim whitespaces
+                            msg = string.format(" glslangValidator: %s ", msg) -- Add surrounding spaces
+
+                            local severity_conversion_table = {
+                                ERROR = vim.diagnostic.severity.ERROR,
+                                WARNING = vim.diagnostic.severity.WARN,
+                                INFO = vim.diagnostic.severity.INFO,
+                                NOTE = vim.diagnostic.severity.HINT,
+                            }
+
+                            opts = {
+                                lnum = line_number,
+                                col = start_col,
+                                message = msg,
+                                severity = severity_conversion_table[valdidator_severity] or vim.diagnostic.severity.ERROR,
+                                end_lnum = line_number,
+                                end_col = end_col,
+                            }
+                        end)
+
+                        std_output = parse_status
+                    end
+                end,
+                on_exit = function(_, data)
+                    vim.fn.chanclose(glslang_job_id, "stdin")
+                    -- Update diagnostics if not in insert and make the file was not switched
+                    if vim.bo.filetype ~= "glsl" then
+                        vim.diagnostic.reset(glslang_namespace, 0)
+                        glslang_timer:stop()
+                        return
+                    end
+
+                    if std_output then
+                        iterations_without_stdout = 0
+                        vim.diagnostic.reset(glslang_namespace, 0)
+                        vim.diagnostic.set(glslang_namespace, 0, { opts })
+                        -- print("STDOUPUT: ", glslang_job_id)
+                    else
+                        iterations_without_stdout = iterations_without_stdout + 1
+                    end
+                end,
+            })
+
+            -- Pass buffer content to the job through the pipe
+            vim.fn.chansend(glslang_job_id, buffer_content)
+        end)
+    )
 end
+
+-- Job pool
+-- local glslang_jobs = {}
+-- local num_concurrent_jobs = 2
+--
+-- function DiagnosticsGLSLUpdate()
+--     -- Ensure correct filetype
+--     if vim.bo.filetype ~= "glsl" then
+--         return
+--     end
+--
+--     -- If there's a previous job, stop it
+--     if glslang_job_id then
+--         vim.diagnostic.reset(glslang_namespace, 0)
+--         vim.fn.jobstop(glslang_job_id)
+--     end
+--
+--     -- Check if there running jobs
+--     if #glslang_jobs > num_concurrent_jobs then
+--         return
+--     end
+--
+--     local glslangValidator_path = "glslangValidator"
+--     local shader_stage = vim.fn.expand "%:e" -- NOTE: File format must be the same as the shader stage
+--     local buffer_content = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+--
+--     local cmd = string.format("%s --stdin -S %s ", glslangValidator_path, shader_stage)
+--
+--     glslang_job_id = vim.fn.jobstart(cmd, {
+--         stdin = "pipe",
+--         stdout_bufferd = true,
+--         on_stdout = function(_, data)
+--             if #data[1] > 0 and data[2] then
+--                 local delimiter = ":"
+--                 local parts = {}
+--
+--                 -- Iterate over each part of the string separated by the delimiter
+--                 for part in string.gmatch(data[2], "[^" .. delimiter .. "]+") do
+--                     table.insert(parts, part)
+--                 end
+--
+--                 -- Since glslangValidator always outputs column 0 just mark the whole line as an error
+--                 local valdidator_severity = parts[1]
+--                 local line_number = tonumber(parts[3]) - 1
+--                 local line_content = vim.api.nvim_buf_get_lines(0, line_number, line_number + 1, false)[1]
+--
+--                 local start_col = (line_content:find "%S" - 1 or #line_content + 1)
+--                 local end_col = #line_content - ((line_content:reverse():find "%S" or #line_content) - 1)
+--
+--                 local msg = parts[5]:sub(1, -2) -- Remove wierd newline character
+--                 msg = msg:gsub("^%s*(.-)%s*$", "%1") -- Trim whitespaces
+--                 msg = string.format(" glslangValidator: %s ", msg) -- Add surrounding spaces
+--
+--                 local severity_conversion_table = {
+--                     ERROR = vim.diagnostic.severity.ERROR,
+--                     WARNING = vim.diagnostic.severity.WARN,
+--                     INFO = vim.diagnostic.severity.INFO,
+--                     NOTE = vim.diagnostic.severity.HINT,
+--                 }
+--
+--                 local opts = {
+--                     lnum = line_number,
+--                     col = start_col,
+--                     message = msg,
+--                     severity = severity_conversion_table[valdidator_severity] or vim.diagnostic.severity.ERROR,
+--                     end_lnum = line_number,
+--                     end_col = end_col,
+--                 }
+--
+--                 -- Update diagnostics
+--                 vim.diagnostic.reset(glslang_namespace, 0)
+--                 vim.diagnostic.set(glslang_namespace, 0, { opts })
+--             end
+--         end,
+--         on_exit = function(_, data)
+--             vim.fn.chanclose(glslang_job_id, "stdin")
+--             glslang_job_id = nil
+--         end,
+--     })
+--
+--     -- Pass buffer content to the job through the pipe
+--     vim.fn.chansend(glslang_job_id, buffer_content)
+-- end
 
 -- Auto close nvim-tree when its the last buffer
 vim.api.nvim_create_autocmd("QuitPre", {
@@ -541,7 +695,7 @@ require("lazy").setup({
             linehl = false, -- Toggle with `:Gitsigns toggle_linehl`
             word_diff = false, -- Toggle with `:Gitsigns toggle_word_diff`
             watch_gitdir = {
-                interval = 1000,
+                interval = 2000,
                 follow_files = true,
             },
             attach_to_untracked = true,
@@ -696,10 +850,30 @@ require("lazy").setup({
                             color = "#B75FF4",
                             name = "nf-md-microsoft_visual_studio",
                         },
-                        ["vcxproj.user"] = {
+                        ["user"] = {
                             icon = "󰘐",
                             color = "#B75FF4",
                             name = "nf-md-microsoft_visual_studio",
+                        },
+                        ["vert"] = {
+                            icon = "󰇟",
+                            color = "#f2a10a",
+                            name = "nf-md-drawing_box",
+                        },
+                        ["frag"] = {
+                            icon = "󰇟",
+                            color = "#f2a10a",
+                            name = "nf-md-drawing_box",
+                        },
+                        ["comp"] = {
+                            icon = "󰇟",
+                            color = "#f2a10a",
+                            name = "nf-md-drawing_box",
+                        },
+                        ["geom"] = {
+                            icon = "󰇟",
+                            color = "#f2a10a",
+                            name = "nf-md-drawing_box",
                         },
                     },
                 },
@@ -918,7 +1092,6 @@ require("lazy").setup({
                     -- Map lsp keybindings
                     keymaps_lsp(event)
 
-                    -- TODO: Make documentation pop up after a while aswell
                     -- When you move your cursor, the highlights will be cleared (the second autocommand).
                     local client = vim.lsp.get_client_by_id(event.data.client_id)
                     if client and client.server_capabilities.documentHighlightProvider then
@@ -1202,30 +1375,33 @@ require("lazy").setup({
                     fields = { "kind", "abbr", "menu" },
                     format = function(entry, vim_item)
                         -- Use this to make the string fields in vim_item constant length
-                        local function clamp(str, length)
+
+                        local function clamp(str, min_length, max_length)
                             if str == nil then
                                 return
                             end
 
                             local current_length = #str
-                            if current_length > length then
-                                -- Trim the string if it's longer than the desired length and add "..."
-                                return string.sub(str, 1, length - 3) .. "..."
-                            elseif current_length < length then
-                                -- Add whitespaces to the end if it's shorter than the desired length
-                                return str .. string.rep(" ", length - current_length)
+
+                            if current_length > max_length then
+                                -- Trim the string if it's longer than the desired max_length and add "..."
+                                return string.sub(str, 1, max_length - 3) .. "..."
+                            elseif current_length < min_length then
+                                -- Add whitespaces to the end if it's shorter than the desired min_length
+                                return str .. string.rep(" ", min_length - current_length)
                             else
-                                -- String is already the desired length
+                                -- String length is within the desired range
                                 return str
                             end
                         end
 
-                        vim_item.abbr = clamp(vim_item.abbr, 30)
-                        vim_item.abbr = vim_item.abbr .. "      " -- Add some padding
-                        vim_item.menu = clamp(entry:get_completion_item().detail, 15)
-
                         -- This concatonates the icons with the name of the item kind
                         vim_item.kind = string.format("%s", kind_icons[vim_item.kind])
+
+                        vim_item.abbr = clamp(vim_item.abbr, 35, 35)
+                        -- vim_item.abbr = vim_item.abbr .. "      " -- Add some padding
+                        -- vim_item.menu = clamp(entry:get_completion_item().detail, 8, 12)
+                        vim_item.menu = ""
 
                         return vim_item
                     end,
@@ -1431,7 +1607,7 @@ require("lazy").setup({
             },
             -- Disable for large files
             disable = function(lang, buf)
-                local max_filesize = 100 * 1024 -- 100 KB
+                local max_filesize = 800 * 1024 -- 800 KB
                 local ok, stats = pcall(vim.loop.fs_stat, vim.api.nvim_buf_get_name(buf))
                 if ok and stats and stats.size > max_filesize then
                     return true
@@ -1745,7 +1921,7 @@ require("lazy").setup({
                     ignore = false,
                     show_on_dirs = true,
                     show_on_open_dirs = true,
-                    timeout = 200,
+                    timeout = 400,
                 },
                 actions = {
                     use_system_clipboard = true,
@@ -2105,22 +2281,6 @@ require("lazy").setup({
         },
     },
 })
-
--- Dumbs a table for debugging
-local function dump(o)
-    if type(o) == "table" then
-        local s = "{ "
-        for k, v in pairs(o) do
-            if type(k) ~= "number" then
-                k = '"' .. k .. '"'
-            end
-            s = s .. "[" .. k .. "] = " .. dump(v) .. ","
-        end
-        return s .. "} "
-    else
-        return tostring(o)
-    end
-end
 
 -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et
