@@ -21,7 +21,6 @@ if vim.fn.has "win32" == 1 then
         },
     }
 end
-
 -- Dumbs a table for debugging
 local function dump(o)
     if type(o) == "table" then
@@ -93,7 +92,7 @@ vim.opt.wrap = false
 vim.opt.pumheight = 5
 
 -- Decrease update time
-vim.opt.updatetime = 100
+vim.opt.updatetime = 500
 
 -- Decrease mapped sequence wait time
 -- Displays which-key popup sooner
@@ -125,30 +124,42 @@ vim.opt.cinkeys = "0{,0},0),0],0#,!^F,o,O,e"
 -- GUI settings
 --vim.opt.guifont = "NotoSansM Nerd Font:h12"
 --vim.opt.foldcolumn = "2"
-vim.opt.signcolumn = "yes:5"
+-- NOTE: This will be updated dynamically
+vim.opt.signcolumn = "yes:1"
 
 vim.cmd "set linespace=3"
 vim.g.neovide_refresh_rate = 165
-vim.g.neovide_no_idle = true
+-- vim.g.neovide_no_idle = false
 vim.g.neovide_confirm_quit = true
 
-vim.g.neovide_cursor_animation_length = 0.035
+vim.g.neovide_vsync = false
 vim.g.neovide_transparency = 1.0
 vim.g.neovide_floating_opacity = 0.4
 vim.g.neovide_floating_blur = true
 vim.g.neovide_remember_window_size = true
 vim.g.neovide_scale_factor = 1.5
-vim.g.neovide_scroll_animation_length = 0.30
+-- vim.g.neovide_cursor_animation_length = 0.035
+vim.g.neovide_scroll_animation_length = 0.28
 vim.g.neovide_cursor_animate_command_line = false
 -- vim.cmd [[ set guicursor=i:ver25-blinkwait10-blinkon500-blinkoff500 ]]
 -- vim.g.neovide_cursor_smooth_blink = false
 vim.cmd [[set mousescroll=ver:5,hor:5]]
 vim.g.neovide_hide_mouse_when_typing = true
 -- vim.g.neovide_scroll_animation_far_lines = 9999
-vim.g.neovide_vsync = true
 
 -- [[ Basic Keymaps ]]
 --  See `:help vim.keymap.set()`
+
+-- vim.cmd [[
+-- inoremap <C-h> <Left>
+-- inoremap <C-j> <Down>
+-- inoremap <C-k> <Up>
+-- inoremap <C-l> <Right>
+-- cnoremap <C-h> <Left>
+-- cnoremap <C-j> <Down>
+-- cnoremap <C-k> <Up>
+-- cnoremap <C-l> <Right>
+-- ]]
 
 local which_key_mappins = {
     ["<leader>s"] = { name = "[S]earch", _ = "which_key_ignore" },
@@ -177,9 +188,16 @@ vim.keymap.set("n", "<C-ScrollWheelDown>", function()
     change_scale_factor(1 / 1.10)
 end)
 
+vim.keymap.set("i", "<C-l>", "<Right>")
+vim.keymap.set("i", "<C-h>", "<Left>")
+
 -- Scrolling
-vim.api.nvim_set_keymap("n", "<C-u>", "<C-u>zz", { noremap = true })
-vim.api.nvim_set_keymap("n", "<C-d>", "<C-d>zz", { noremap = true })
+-- vim.api.nvim_set_keymap("n", "<C-u>", "<C-u>zz", { noremap = true })
+-- vim.api.nvim_set_keymap("n", "<C-d>", "<C-d>zz", { noremap = true })
+vim.cmd [[
+    nnoremap n nzzzv
+    nnoremap N Nzzzv
+]]
 
 vim.cmd "set whichwrap+=<,>,[,],h,l"
 vim.cmd [[set iskeyword+=-]]
@@ -216,10 +234,10 @@ vim.keymap.set("n", "<C-k>", "<C-w>k")
 vim.keymap.set("n", "<C-l>", "<C-w>l")
 
 -- Resize with arrows
-vim.keymap.set("n", "<C-Up>", ":resize -2<CR>")
-vim.keymap.set("n", "<C-Down>", ":resize +2<CR>")
-vim.keymap.set("n", "<C-Left>", ":vertical resize -2<CR>")
-vim.keymap.set("n", "<C-Right>", ":vertical resize +2<CR>")
+vim.keymap.set("n", "<C-Up>", ":resize +2<CR>")
+vim.keymap.set("n", "<C-Down>", ":resize -2<CR>")
+vim.keymap.set("n", "<C-Left>", ":vertical resize +2<CR>")
+vim.keymap.set("n", "<C-Right>", ":vertical resize -2<CR>")
 
 vim.keymap.set("n", "<S-l>", "<cmd>silent!bnext<CR>")
 vim.keymap.set("n", "<S-h>", "<cmd>silent!bprev<CR>")
@@ -229,6 +247,7 @@ vim.keymap.set("n", "<S-h>", "<cmd>silent!bprev<CR>")
 
 -- Window spilt (vsplit)
 vim.keymap.set("n", "<leader>v", "<cmd>silent!vsplit<CR>", { desc = "Vertical Split" })
+-- vim.keymap.set("n", "<leader>", "<cmd>silent!split<CR>", { desc = "Horizontal Split" })
 
 -- Easymotion
 -- vim.keymap.set("n", "<leader>a", "<Plug>(easymotion-overwin-f2)", { desc = "Easymotion" })
@@ -344,6 +363,7 @@ vim.cmd [[
          autocmd TextYankPost * silent!lua require('vim.highlight').on_yank({timeout = 200})
          autocmd BufWinEnter * :set formatoptions-=cro
          autocmd FileType qf set nobuflisted
+         autocmd WinResized * lua AdjustSignColumns()
      augroup end
 
      augroup _git
@@ -381,6 +401,29 @@ vim.cmd [[
      "    autocmd TextChanged,TextChangedI *[^.cpp,.c,.glsl] ColorizerAttachToBuffer
      " augroup end
  ]]
+
+function AdjustSignColumns()
+    local position = vim.api.nvim_win_get_position(0)
+    local buffer_name = vim.fn.expand "%"
+
+    local maybe_sign_column = true
+
+    if buffer_name == "NvimTree_1" then
+        maybe_sign_column = false
+    end
+
+    for _, window in ipairs(vim.api.nvim_list_wins()) do
+        local x_pos = position[2]
+        local buf = vim.api.nvim_win_get_buf(window)
+        if string.len(vim.bo[buf].buftype) == 0 then
+            if x_pos <= 0 and maybe_sign_column then
+                vim.api.nvim_win_set_option(window, "signcolumn", "yes:5")
+            else
+                vim.api.nvim_win_set_option(window, "signcolumn", "yes:1")
+            end
+        end
+    end
+end
 
 local glslang_namespace = vim.api.nvim_create_namespace "glslangValidator"
 local channel_id = nil
@@ -480,13 +523,17 @@ vim.api.nvim_create_autocmd("QuitPre", {
     end,
 })
 
+--vim.api.nvim_create_autocmd("BufLeave", {
+--
+--}
+
 -- [[ Install `lazy.nvim` plugin manager ]]
 --    See `:help lazy.nvim.txt` or https://github.com/folke/lazy.nvim for more info
 local lazypath = vim.fn.stdpath "data" .. "/lazy/lazy.nvim"
 if not vim.loop.fs_stat(lazypath) then
     local lazyrepo = "https://github.com/folke/lazy.nvim.git"
     vim.fn.system { "git", "clone", "--filter=blob:none", "--branch=stable", lazyrepo, lazypath }
-end ---@diagnostic disable-next-line: undefined-field
+end
 vim.opt.rtp:prepend(lazypath)
 
 -- [[ Configure and install plugins ]]
@@ -1160,7 +1207,9 @@ require("lazy").setup({
                         luasnip.lsp_expand(args.body)
                     end,
                 },
-                completion = { completeopt = "menu,menuone,noinsert,noselect" },
+                completion = {
+                    completeopt = "menu,menuone,noinsert,noselect",
+                },
                 window = {
                     documentation = cmp.config.disable,
                     completion = {
@@ -1194,19 +1243,23 @@ require("lazy").setup({
                             luasnip.expand()
                         elseif luasnip.expand_or_jumpable() then
                             luasnip.expand_or_jump()
+                        else
+                            vim.fn.feedkeys(" ", "i")
                         end
                     end, {
                         "i",
                         "s",
                     }),
-                    ["<C-S-Space>"] = cmp.mapping(function(fallback)
-                        if luasnip.jumpable(-1) then
-                            luasnip.jump(-1)
-                        end
-                    end, {
-                        "i",
-                        "s",
-                    }),
+                    -- ["<S-Space>"] = cmp.mapping(function(fallback)
+                    --     if luasnip.jumpable(-1) then
+                    --         luasnip.jump(-1)
+                    --     else
+                    --         vim.fn.feedkeys(" ", "i")
+                    --     end
+                    -- end, {
+                    --     "i",
+                    --     "s",
+                    -- }),
                     ["<Tab>"] = cmp.mapping(function(fallback)
                         if cmp.visible() then
                             cmp.select_next_item()
@@ -1267,11 +1320,11 @@ require("lazy").setup({
                     end,
                 },
                 sources = {
-                    { name = "path" },
-                    { name = "nvim_lsp" },
-                    { name = "luasnip" },
-                    { name = "buffer" },
-                    { name = "nvim_lsp_signature_help" },
+                    { name = "path", keyword_length = 1 },
+                    { name = "nvim_lsp", max_item_count = 5, keyword_length = 1 },
+                    { name = "luasnip", keyword_length = 1 },
+                    { name = "buffer", max_item_count = 3, keyword_length = 1 },
+                    { name = "nvim_lsp_signature_help", keyword_length = 1 },
                 },
                 confirm_opts = {
                     behavior = cmp.ConfirmBehavior.Replace,
@@ -1281,24 +1334,6 @@ require("lazy").setup({
                     ghost_text = true,
                 },
             }
-
-            -- vim.api.nvim_set_hl(0, "Pmenu", { bg = "#252526", fg = "#CFCFCF" })
-            -- -- gray
-            -- vim.api.nvim_set_hl(0, "CmpItemAbbrDeprecated", { bg = "NONE", strikethrough = true, fg = "#808080" })
-            -- -- blue
-            -- vim.api.nvim_set_hl(0, "CmpItemAbbrMatch", { bg = "NONE", fg = "#569CD6" })
-            -- vim.api.nvim_set_hl(0, "CmpItemAbbrMatchFuzzy", { link = "CmpIntemAbbrMatch" })
-            -- -- light blue
-            -- vim.api.nvim_set_hl(0, "CmpItemKindVariable", { bg = "#FFFFFF", fg = "#9CDCFE" })
-            -- vim.api.nvim_set_hl(0, "CmpItemKindInterface", { link = "CmpItemKindVariable" })
-            -- vim.api.nvim_set_hl(0, "CmpItemKindText", { link = "CmpItemKindVariable" })
-            -- -- pink
-            -- vim.api.nvim_set_hl(0, "CmpItemKindFunction", { bg = "NONE", fg = "#C586C0" })
-            -- vim.api.nvim_set_hl(0, "CmpItemKindMethod", { link = "CmpItemKindFunction" })
-            -- -- front
-            -- vim.api.nvim_set_hl(0, "CmpItemKindKeyword", { bg = "NONE", fg = "#D4D4D4" })
-            -- vim.api.nvim_set_hl(0, "CmpItemKindProperty", { link = "CmpItemKindKeyword" })
-            -- vim.api.nvim_set_hl(0, "CmpItemKindUnit", { link = "CmpItemKindKeyword" })
         end,
     },
     {
@@ -1322,6 +1357,19 @@ require("lazy").setup({
         "bartekprtc/gruv-vsassist.nvim",
         init = function()
             vim.cmd.colorscheme "gruv-vsassist"
+
+            local function get_color(highlight, layer)
+                return vim.fn.synIDattr(vim.fn.synIDtrans(vim.fn.hlID(highlight)), layer or "fg", "gui")
+            end
+
+            local buffer_bg_color = get_color("BufferCurrent", "bg")
+            vim.api.nvim_set_hl(0, "WinSeparator", { fg = buffer_bg_color, bg = buffer_bg_color })
+
+            vim.api.nvim_set_hl(0, "CmpItemKind", { bold = true })
+            vim.api.nvim_set_hl(0, "CmpItemAbbr", { link = "NvimTreeGitIgnored", italic = false })
+            -- vim.api.nvim_set_hl(0, "CmpItemKindText", { link = "number", italic = false })
+            vim.api.nvim_set_hl(0, "CmpItemAbbrMatch", { link = "NvimTreeNormal", italic = false, bold = true })
+            vim.api.nvim_set_hl(0, "CmpItemAbbrMatchFuzzy", { link = "NvimTreeNormal", italic = false, bold = true })
         end,
     },
     -- {
@@ -1441,7 +1489,6 @@ require("lazy").setup({
             -- You can configure sections in the statusline by overriding their
             -- default behavior. For example, here we set the section for
             -- cursor location to LINE:COLUMN
-            ---@diagnostic disable-next-line: duplicate-set-field
             -- statusline.section_location = function()
             -- return '%2l:%-2v'
             -- end
@@ -1479,7 +1526,47 @@ require("lazy").setup({
             -- [[ Configure Treesitter ]] See `:help nvim-treesitter`
             require("nvim-treesitter.install").prefer_git = true
             require("nvim-treesitter.install").compilers = { "clang", "gcc" }
-            ---@diagnostic disable-next-line: missing-fields
+
+            -- Insert mode keybindings
+            opts.textobjects = {
+                move = {
+                    enable = true,
+                    set_jumps = true, -- whether to set jumps in the jumplist
+                    goto_next_start = {
+                        -- ["]]"] = { query = "@class.outer", desc = "Next class start" },
+                        -- --
+                        -- -- You can use regex matching (i.e. lua pattern) and/or pass a list in a "query" key to group multiple queires.
+                        -- ["]o"] = "@loop.*",
+                        -- -- ["]o"] = { query = { "@loop.inner", "@loop.outer" } }
+                        -- --
+                        -- -- You can pass a query group to use query from `queries/<lang>/<query_group>.scm file in your runtime path.
+                        -- -- Below example nvim-treesitter's `locals.scm` and `folds.scm`. They also provide highlights.scm and indent.scm.
+                        -- ["]s"] = { query = "@scope", query_group = "locals", desc = "Next scope" },
+                        -- ["]z"] = { query = "@fold", query_group = "folds", desc = "Next fold" },
+                    },
+                    --     goto_next_end = {
+                    --         ["]M"] = "@function.outer",
+                    --         ["]["] = "@class.outer",
+                    --     },
+                    --     goto_previous_start = {
+                    --         ["[m"] = "@function.outer",
+                    --         ["[["] = "@class.outer",
+                    --     },
+                    --     goto_previous_end = {
+                    --         ["[M"] = "@function.outer",
+                    --         ["[]"] = "@class.outer",
+                    --     },
+                    --     -- Below will go to either the start or the end, whichever is closer.
+                    --     -- Use if you want more granular movements
+                    --     -- Make it even more gradual by adding multiple queries and regex.
+                    --     goto_next = {
+                    --         ["]d"] = "@conditional.outer",
+                    --     },
+                    --     goto_previous = {
+                    --         ["[d"] = "@conditional.outer",
+                    --     },
+                },
+            }
             require("nvim-treesitter.configs").setup(opts)
 
             -- There are additional nvim-treesitter modules that you can use to interact
@@ -1489,6 +1576,12 @@ require("lazy").setup({
             --    - Show your current context: https://github.com/nvim-treesitter/nvim-treesitter-context
             --    - Treesitter + textobjects: https://github.com/nvim-treesitter/nvim-treesitter-textobjects
         end,
+    },
+    {
+        "nvim-treesitter/nvim-treesitter-textobjects",
+        dependencies = {
+            "nvim-treesitter",
+        },
     },
     {
         "tikhomirov/vim-glsl",
@@ -1670,7 +1763,7 @@ require("lazy").setup({
                 view = {
                     adaptive_size = false,
                     centralize_selection = false,
-                    width = 28,
+                    width = 25,
                     side = "left",
                     preserve_window_proportions = false,
                     number = false,
@@ -1979,25 +2072,25 @@ require("lazy").setup({
 
                     local mode_color = {
                         n = default_color, -- Normal mode
-                        i = get_color "@definition.var", -- Insert mode
-                        v = get_color "@definition.macro", -- Visual mode
-                        [""] = get_color "@definition.macro", -- Visual Block mode
-                        V = get_color "@definition.macro", -- Line Visual mode
-                        c = get_color "@definition.function", -- Command-line mode
-                        no = get_color "@definition.macro", -- Operator-pending mode
-                        s = get_color "@defintion.var", -- Select mode
-                        S = get_color "@definition.enum", -- Line Select mode
-                        [""] = get_color "@definition.macro", -- Select Block mode
-                        ic = get_color "@definition.method", -- Insert mode completion
-                        R = get_color "@definition.type", -- Replace mode
-                        Rv = get_color "@defintion.import", -- Virtual Replace mode
-                        cv = get_color "@definition.character", -- Command-line window mode
-                        ce = get_color "@definition.constant", -- Normal Ex mode
-                        r = get_color "@definition.macro", -- Hit-enter prompt
-                        rm = get_color "@defintion.var", -- More-prompt
-                        ["r?"] = get_color "@definition.enum", -- Confirm-prompt
-                        ["!"] = get_color "@definition.function", -- Shell mode
-                        t = get_color "@definition.method", -- Terminal mode
+                        i = get_color "DevIconClojureC", -- Insert mode
+                        v = get_color "NvimTreeSpecialFile", -- Visual mode
+                        [""] = get_color "NvimTreeSpecialFile", -- Visual Block mode
+                        V = get_color "NvimTreeSpecialFile", -- Line Visual mode
+                        c = get_color "TodoFgTODO", -- Command-line mode
+                        no = get_color "NvimTreeSpecialFile", -- Operator-pending mode
+                        s = get_color "DevIconClojureC", -- Select mode
+                        S = get_color "DevIconClojureC", -- Line Select mode
+                        [""] = get_color "NvimTreeSpecialFile", -- Select Block mode
+                        ic = get_color "TodoFgTODO", -- Insert mode completion
+                        R = get_color "DevIconClojureC", -- Replace mode
+                        Rv = get_color "DevIconClojureC", -- Virtual Replace mode
+                        cv = get_color "TodoFgTODO", -- Command-line window mode
+                        ce = get_color "TodoFgTODO", -- Normal Ex mode
+                        r = get_color "NvimTreeSpecialFile", -- Hit-enter prompt
+                        rm = get_color "NvimTreeSpecialFile", -- More-prompt
+                        ["r?"] = get_color "NvimTreeSpecialFile", -- Confirm-prompt
+                        ["!"] = get_color "TodoFgTODO", -- Shell mode
+                        t = get_color "TodoFgTODO", -- Terminal mode
                     }
 
                     return {
