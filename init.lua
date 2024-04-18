@@ -4,10 +4,10 @@ if vim.fn.has "win32" == 1 then
     vim.opt.shellcmdflag =
         "-NoLogo -NoProfile -ExecutionPolicy RemoteSigned -Command [Console]::InputEncoding=[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;"
     vim.cmd [[
-        let &shellredir = '2>&1 | Out-File -Encoding UTF8 %s; exit $LastExitCode'
-        let &shellpipe = '2>&1 | Out-File -Encoding UTF8 %s; exit $LastExitCode'
-        set shellquote= shellxquote=
-        ]]
+         let &shellredir = '2>&1 | Out-File -Encoding UTF8 %s; exit $LastExitCode'
+         let &shellpipe = '2>&1 | Out-File -Encoding UTF8 %s; exit $LastExitCode'
+         set shellquote= shellxquote=
+         ]]
 
     -- Set a compatible clipboard manager
     vim.g.clipboard = {
@@ -35,6 +35,10 @@ local function dump(o)
     else
         return tostring(o)
     end
+end
+
+local function get_color(highlight, layer)
+    return vim.fn.synIDattr(vim.fn.synIDtrans(vim.fn.hlID(highlight)), layer or "fg", "gui")
 end
 
 -- Set <space> as the leader key
@@ -112,7 +116,7 @@ vim.opt.listchars = { tab = "» ", trail = "·", nbsp = "␣" }
 vim.opt.inccommand = "split"
 
 -- Show which line your cursor is on
-vim.opt.cursorline = true
+vim.opt.cursorline = false
 
 -- Minimal number of screen lines to keep above and below the cursor.
 vim.opt.scrolloff = 8
@@ -129,18 +133,21 @@ vim.opt.signcolumn = "yes:1"
 
 vim.cmd "set linespace=3"
 vim.g.neovide_refresh_rate = 165
--- vim.g.neovide_no_idle = false
+vim.g.neovide_refresh_rate_idle = 165
+vim.g.neovide_no_idle = true
 vim.g.neovide_confirm_quit = true
+vim.g.neovide_fullscreen = false
+vim.g.neovide_frame = false
 
-vim.g.neovide_vsync = false
+-- vim.g.neovide_vsync = false
 vim.g.neovide_transparency = 1.0
 vim.g.neovide_floating_opacity = 0.4
 vim.g.neovide_floating_blur = true
 vim.g.neovide_remember_window_size = true
 vim.g.neovide_scale_factor = 1.5
 -- vim.g.neovide_cursor_animation_length = 0.035
-vim.g.neovide_scroll_animation_length = 0.28
-vim.g.neovide_cursor_animate_command_line = false
+-- vim.g.neovide_scroll_animation_length = 0.28
+vim.g.neovide_cursor_animate_command_line = true
 -- vim.cmd [[ set guicursor=i:ver25-blinkwait10-blinkon500-blinkoff500 ]]
 -- vim.g.neovide_cursor_smooth_blink = false
 vim.cmd [[set mousescroll=ver:5,hor:5]]
@@ -188,16 +195,15 @@ vim.keymap.set("n", "<C-ScrollWheelDown>", function()
     change_scale_factor(1 / 1.10)
 end)
 
+-- Navigation in insert mode
 vim.keymap.set("i", "<C-l>", "<Right>")
 vim.keymap.set("i", "<C-h>", "<Left>")
 
 -- Scrolling
--- vim.api.nvim_set_keymap("n", "<C-u>", "<C-u>zz", { noremap = true })
--- vim.api.nvim_set_keymap("n", "<C-d>", "<C-d>zz", { noremap = true })
 vim.cmd [[
-    nnoremap n nzzzv
-    nnoremap N Nzzzv
-]]
+     nnoremap n nzzzv
+     nnoremap N Nzzzv
+ ]]
 
 vim.cmd "set whichwrap+=<,>,[,],h,l"
 vim.cmd [[set iskeyword+=-]]
@@ -357,70 +363,81 @@ end
 
 -- autocmd BufWinEnter,FocusGained,BufWritePost * :lua CheckGitFileStatus()
 vim.cmd [[
-     augroup _general_settings
-         autocmd!
-         autocmd FileType qf,help,man,lspinfo nnoremap <silent> <buffer> q :close<CR>
-         autocmd TextYankPost * silent!lua require('vim.highlight').on_yank({timeout = 200})
-         autocmd BufWinEnter * :set formatoptions-=cro
-         autocmd FileType qf set nobuflisted
-         autocmd WinResized * lua AdjustSignColumns()
+      augroup _general_settings
+          autocmd!
+          autocmd FileType qf,help,man,lspinfo nnoremap <silent> <buffer> q :close<CR>
+          autocmd TextYankPost * silent!lua require('vim.highlight').on_yank({timeout = 200})
+          autocmd BufWinEnter * :set formatoptions-=cro
+          autocmd FileType qf set nobuflisted
+          autocmd WinResized * lua AdjustSignColumns()
+      augroup end
+
+      augroup _git
+          autocmd!
+          autocmd FileType gitcommit setlocal wrap
+          autocmd FileType gitcommit setlocal spell
      augroup end
 
-     augroup _git
+      augroup _markdown
+          autocmd!
+          autocmd FileType markdown setlocal wrap
+          autocmd FileType markdown setlocal spell
+      augroup end
+
+      augroup _auto_resize
+          autocmd!
+          autocmd VimResized * tabdo wincmd =
+      augroup end
+
+      augroup _guess_indent
+          autocmd!
+          autocmd BufWinEnter * silent!GuessIndent
+      augroup end
+
+      augroup _glsl
          autocmd!
-         autocmd FileType gitcommit setlocal wrap
-         autocmd FileType gitcommit setlocal spell
-    augroup end
+         autocmd BufNewFile,BufReadPost,BufWinEnter,BufNewFile *.vert,*.frag,*.geom,*.comp :set ft=glsl
+         autocmd BufWinEnter,BufEnter,TextChanged,InsertLeavePre * lua if vim.bo.filetype == 'glsl' then DiagnosticsGlslWatch() end
+         autocmd BufWinEnter,BufEnter * lua if vim.bo.filetype ~= 'glsl' then DiagnosticsGlslClear() end
+      augroup end
 
-     augroup _markdown
+      augroup _colorizer
          autocmd!
-         autocmd FileType markdown setlocal wrap
-         autocmd FileType markdown setlocal spell
-     augroup end
+         " PERF: The excluded files are defined on two separate place
+         autocmd TextChanged,TextChangedI *[^.cpp,.c,.glsl] ReloadColorizer
+      augroup end
 
-     augroup _auto_resize
-         autocmd!
-         autocmd VimResized * tabdo wincmd =
-     augroup end
-
-     augroup _guess_indent
-         autocmd!
-         autocmd BufWinEnter * silent!GuessIndent
-     augroup end
-
-     augroup _glsl
-        autocmd!
-        autocmd BufNewFile,BufReadPost,BufWinEnter,BufNewFile *.vert,*.frag,*.geom,*.comp :set ft=glsl
-        autocmd BufWinEnter,BufEnter,TextChanged,InsertLeavePre * lua if vim.bo.filetype == 'glsl' then DiagnosticsGlslWatch() end
-        autocmd BufWinEnter,BufEnter * lua if vim.bo.filetype ~= 'glsl' then DiagnosticsGlslClear() end
-     augroup end
-
-     " augroup _colorizer
-     "    autocmd!
-     "    " PERF: The excluded files are defined on two separate place
-     "    autocmd TextChanged,TextChangedI *[^.cpp,.c,.glsl] ColorizerAttachToBuffer
-     " augroup end
- ]]
+      function! ReloadColorizer()
+         call ColorizerToggle()
+         call ColorizerToggle()
+      endfunction
+  ]]
 
 function AdjustSignColumns()
-    local position = vim.api.nvim_win_get_position(0)
-    local buffer_name = vim.fn.expand "%"
-
     local maybe_sign_column = true
+    local window_width = vim.api.nvim_win_get_width(vim.api.nvim_get_current_win())
 
-    if buffer_name == "NvimTree_1" then
+    -- Dont use signcolumn if the main window is small enough
+    if window_width < 127 then
         maybe_sign_column = false
     end
 
-    for _, window in ipairs(vim.api.nvim_list_wins()) do
-        local x_pos = position[2]
-        local buf = vim.api.nvim_win_get_buf(window)
-        if string.len(vim.bo[buf].buftype) == 0 then
-            if x_pos <= 0 and maybe_sign_column then
-                vim.api.nvim_win_set_option(window, "signcolumn", "yes:5")
-            else
-                vim.api.nvim_win_set_option(window, "signcolumn", "yes:1")
-            end
+    local non_floating_wins = vim.fn.filter(vim.api.nvim_list_wins(), function(k, v)
+        -- Dont use signcolumn if nvim-tree is open
+        local bufname = vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(v))
+        if bufname:match "NvimTree_" ~= nil then
+            maybe_sign_column = false
+        end
+
+        return vim.api.nvim_win_get_config(v).relative == ""
+    end)
+
+    for _, window in ipairs(non_floating_wins) do
+        local x_pos = vim.api.nvim_win_get_position(window)[2]
+        if maybe_sign_column and x_pos <= 0 then
+            vim.api.nvim_win_set_option(window, "signcolumn", "yes:5")
+        else
+            vim.api.nvim_win_set_option(window, "signcolumn", "yes:1")
         end
     end
 end
@@ -443,6 +460,9 @@ function DiagnosticsGlslWatch()
         vim.fn.jobstop(channel_id)
     end
 
+    local parse_diagnostic_successful = false
+    local opts = {}
+
     channel_id = vim.fn.jobstart(cmd, {
         stdin = "pipe",
         on_stdout = function(_, data)
@@ -455,9 +475,8 @@ function DiagnosticsGlslWatch()
                     table.insert(parts, part)
                 end
 
-                local opts = {}
                 --  Try parse the string
-                local parse_successful, _ = pcall(function()
+                parse_diagnostic_successful, _ = pcall(function()
                     -- Since glslangValidator always outputs column 0 just mark the whole line as an error
                     local valdidator_severity = parts[1]
                     local line_number = tonumber(parts[3]) - 1
@@ -486,11 +505,15 @@ function DiagnosticsGlslWatch()
                         end_col = end_col,
                     }
                 end)
+            end
+        end,
+        on_exit = function(_, exit_code)
+            if exit_code == 0 or exit_code == 1 then
+                vim.diagnostic.reset(glslang_namespace, 0)
+            end
 
-                if parse_successful and vim.bo.filetype == "glsl" then
-                    vim.diagnostic.reset(glslang_namespace, 0)
-                    vim.diagnostic.set(glslang_namespace, 0, { opts })
-                end
+            if parse_diagnostic_successful and vim.bo.filetype == "glsl" then
+                vim.diagnostic.set(glslang_namespace, 0, { opts })
             end
         end,
     })
@@ -523,9 +546,7 @@ vim.api.nvim_create_autocmd("QuitPre", {
     end,
 })
 
---vim.api.nvim_create_autocmd("BufLeave", {
---
---}
+local nvchad = {}
 
 -- [[ Install `lazy.nvim` plugin manager ]]
 --    See `:help lazy.nvim.txt` or https://github.com/folke/lazy.nvim for more info
@@ -812,7 +833,8 @@ require("lazy").setup({
                         "--column",
                         "--smart-case",
                     },
-                    prompt_prefix = " ",
+                    prompt_prefix = "  ",
+                    selection_caret = "  ",
                     -- selection_caret = "",
                     -- selection_strategy = "reset",
                     -- sorting_strategy = "ascending",
@@ -1314,7 +1336,7 @@ require("lazy").setup({
                         vim_item.abbr = clamp(vim_item.abbr, 35, 35)
                         -- vim_item.abbr = vim_item.abbr .. "      " -- Add some padding
                         -- vim_item.menu = clamp(entry:get_completion_item().detail, 8, 12)
-                        vim_item.menu = ""
+                        vim_item.menu = nil
 
                         return vim_item
                     end,
@@ -1330,57 +1352,144 @@ require("lazy").setup({
                     behavior = cmp.ConfirmBehavior.Replace,
                     select = false,
                 },
+                matching = {
+                    disallow_fuzzy_matching = true,
+                    disallow_fullfuzzy_matching = true,
+                    disallow_partial_fuzzy_matching = true,
+                    disallow_partial_matching = true,
+                    disallow_prefix_unmatching = false,
+                    disallow_symbol_nonprefix_matching = false,
+                },
                 experimental = {
-                    ghost_text = true,
+                    ghost_text = {
+                        -- hl_group = "LineNr",
+                        hl_group = "TSText",
+                    },
                 },
             }
         end,
     },
+
     {
         "LunarVim/Colorschemes",
         priority = 1000, -- Make sure to load this before all the other start plugins.
         enabled = true,
-        init = function()
-            -- vim.cmd.colorscheme "onedark"
-
-            -- vim.api.nvim_set_hl(0, "CmpItemKind", { bold = true })
-            -- vim.api.nvim_set_hl(0, "CmpItemAbbr", { link = "Comment", italic = false })
-            -- vim.api.nvim_set_hl(0, "CmpItemKindText", { link = "Comment", italic = false })
-            -- vim.api.nvim_set_hl(0, "CmpItemAbbrMatch", { link = "Comment", italic = false })
-            -- vim.api.nvim_set_hl(0, "CmpItemAbbrMatchFuzzy", { link = "Comment", italic = false })
+        -- init = function()
+        --     vim.cmd.colorscheme "onedark"
+        --
+        --     local buffer_bg_color = get_color("BufferCurrent", "bg")
+        --     local comment_color = get_color "Comment"
+        --     local onedark_palette = require "onedark.palette"
+        --
+        --     vim.api.nvim_set_hl(0, "WinSeparator", { fg = buffer_bg_color, bg = buffer_bg_color })
+        --
+        --     vim.api.nvim_set_hl(0, "Type", { fg = onedark_palette.cyan, italic = false, bold = false })
+        --     vim.api.nvim_set_hl(0, "@storageclass", { fg = onedark_palette.cyan, italic = false, bold = false })
+        --     vim.api.nvim_set_hl(0, "Structure", { fg = onedark_palette.cyan, italic = false, bold = false })
+        --     vim.api.nvim_set_hl(0, "Function", { fg = onedark_palette.blue, italic = false, bold = false })
+        --     vim.api.nvim_set_hl(0, "@function.builtin", { fg = onedark_palette.cyan, italic = false, bold = false })
+        --     vim.api.nvim_set_hl(0, "@method", { link = "Function" })
+        --     vim.api.nvim_set_hl(0, "Keyword", { fg = onedark_palette.purple, italic = false, bold = false })
+        --     vim.api.nvim_set_hl(0, "Conditional", { fg = onedark_palette.purple, italic = false, bold = false })
+        --     vim.api.nvim_set_hl(0, "Constant", { fg = onedark_palette.orange, italic = false, bold = false })
+        --     vim.api.nvim_set_hl(0, "Boolean", { fg = onedark_palette.orange, italic = false, bold = false })
+        --
+        --     vim.api.nvim_set_hl(0, "String", { fg = onedark_palette.green, italic = false, bold = false })
+        --     vim.api.nvim_set_hl(0, "@string.escape", { fg = onedark_palette.cyan, italic = false, bold = false })
+        --     vim.api.nvim_set_hl(0, "@string.special", { fg = onedark_palette.cyan, italic = false, bold = false })
+        --
+        --     vim.api.nvim_set_hl(0, "@field", { fg = onedark_palette.red, italic = false, bold = false })
+        --     vim.api.nvim_set_hl(0, "@property", { fg = onedark_palette.red, italic = false, bold = false })
+        --     vim.api.nvim_set_hl(0, "@lsp.type.property", { fg = onedark_palette.red, italic = false, bold = false })
+        --
+        --
+        --     vim.api.nvim_set_hl(0, "@operator", { fg = onedark_palette.purple, italic = false, bold = false })
+        --
+        --     -- vim.api.nvim_set_hl(0, "@parameter", { fg = onedark_palette.orange, italic = true, bold = false })
+        --     -- vim.api.nvim_set_hl(0, "@lsp.type.parameter", { fg = onedark_palette.orange, italic = true, bold = false })
+        --
+        --     vim.api.nvim_set_hl(0, "CmpItemKind", { bold = true })
+        --     vim.api.nvim_set_hl(0, "CmpItemAbbr", { fg = onedark_palette.alt_fg, italic = false, bold = false })
+        --     vim.api.nvim_set_hl(0, "CmpItemKindText", { fg = onedark_palette.alt_fg, italic = false, bold = false })
+        --     vim.api.nvim_set_hl(0, "CmpItemAbbrMatch", { fg = onedark_palette.fg, italic = false, bold = false })
+        --     vim.api.nvim_set_hl(0, "CmpItemAbbrMatchFuzzy", { fg = onedark_palette.fg, italic = false, bold = false })
+        -- end,
+    },
+    {
+        "Nuclear-Squid/photon.nvim",
+        enabled = false,
+        config = function()
+            require("photon").load()
         end,
     },
     {
         -- https://github.com/septag/vscode-vax-dark-theme/blob/master/themes/Visual%20Assist%20Dark-color-theme.json
         priority = 1000,
-        enabled = true,
+        enabled = false,
         "bartekprtc/gruv-vsassist.nvim",
         init = function()
             vim.cmd.colorscheme "gruv-vsassist"
-
-            local function get_color(highlight, layer)
-                return vim.fn.synIDattr(vim.fn.synIDtrans(vim.fn.hlID(highlight)), layer or "fg", "gui")
-            end
 
             local buffer_bg_color = get_color("BufferCurrent", "bg")
             vim.api.nvim_set_hl(0, "WinSeparator", { fg = buffer_bg_color, bg = buffer_bg_color })
 
             vim.api.nvim_set_hl(0, "CmpItemKind", { bold = true })
             vim.api.nvim_set_hl(0, "CmpItemAbbr", { link = "NvimTreeGitIgnored", italic = false })
+            vim.api.nvim_set_hl(0, "CmpItemAbbrDeprecated", { link = "LineNr", italic = false, bold = false })
+            vim.api.nvim_set_hl(0, "CmpItemAbbrDeprecatedDefault", { link = "LineNr", italic = false, bold = false })
             -- vim.api.nvim_set_hl(0, "CmpItemKindText", { link = "number", italic = false })
             vim.api.nvim_set_hl(0, "CmpItemAbbrMatch", { link = "NvimTreeNormal", italic = false, bold = true })
             vim.api.nvim_set_hl(0, "CmpItemAbbrMatchFuzzy", { link = "NvimTreeNormal", italic = false, bold = true })
         end,
     },
-    -- {
-    --     "wuelnerdotexe/vim-enfocado",
-    --     priority = 1000,
-    --     enabled = false,
-    --     init = function()
-    --         vim.g.enfocado_style = "nature"
-    --         vim.cmd.colorscheme "enfocado"
-    --     end,
-    -- },
+    {
+        "NvChad/base46",
+        priority = 1000,
+        enabled = true,
+        init = function()
+            vim.g.base46_cache = vim.fn.stdpath "config" .. "/nvcache/"
+            require("base46").load_all_highlights()
+
+            local buffer_bg_color = get_color("Normal", "bg")
+            vim.api.nvim_set_hl(0, "WinSeparator", { fg = buffer_bg_color, bg = buffer_bg_color })
+
+            -- vim.api.nvim_set_hl(0, "Statusline", { link = "NvimTreeWinSeparator" })
+            -- vim.api.nvim_set_hl(0, "StatusLineNC", { link = "NvimTreeWinSeparator" })
+            -- vim.api.nvim_set_hl(0, "NvimTreeStatusLineNC", { link = "NvimTreeWinSeparator" })
+
+            vim.api.nvim_set_hl(0, "Statusline", { link = "NvimTreeWinSeparator" })
+            vim.api.nvim_set_hl(0, "StatusLineNC", { link = "NvimTreeWinSeparator" })
+            vim.api.nvim_set_hl(0, "NvimTreeStatusLineNC", { link = "NvimTreeWinSeparator" })
+
+            vim.api.nvim_set_hl(0, "TelescopePreviewTitle", { link = "TelescopeBorder" })
+            vim.api.nvim_set_hl(0, "TelescopePromptTitle", { link = "CursorLine" })
+
+            vim.api.nvim_set_hl(0, "LspReferenceRead", { link = "Visual" })
+            vim.api.nvim_set_hl(0, "LspReferenceWrite", { link = "Visual" })
+            vim.api.nvim_set_hl(0, "LspReferenceText", { link = "Visual" })
+
+            vim.cmd.highlight "DiagnosticUnderlineError gui=undercurl"
+            vim.cmd.highlight "DiagnosticUnderlineWarn gui=undercurl"
+            vim.cmd.highlight "DiagnosticUnderlineOk gui=undercurl"
+            vim.cmd.highlight "DiagnosticUnderlineHint gui=undercurl"
+            vim.cmd.highlight "DiagnosticUnderlineInfo gui=undercurl"
+        end,
+    },
+    {
+        "wuelnerdotexe/vim-enfocado",
+        priority = 1000,
+        enabled = false,
+        init = function()
+            vim.g.enfocado_style = "nature"
+            vim.cmd.colorscheme "enfocado"
+        end,
+    },
+    {
+        "HiPhish/rainbow-delimiters.nvim",
+        config = function()
+            require("rainbow-delimiters.setup").setup {}
+        end,
+    },
     -- {
     --     "folke/tokyonight.nvim",
     --     priority = 1000, -- Make sure to load this before all the other start plugins.
@@ -1980,6 +2089,7 @@ require("lazy").setup({
     {
         "nvim-lualine/lualine.nvim",
         dependencies = { "nvim-tree/nvim-web-devicons" },
+        enabled = true,
         config = function()
             local lualine = require "lualine"
             local icons = require "nvim-web-devicons"
@@ -1990,14 +2100,10 @@ require("lazy").setup({
                 end,
             }
 
-            local function get_color(highlight, layer)
-                return vim.fn.synIDattr(vim.fn.synIDtrans(vim.fn.hlID(highlight)), layer or "fg", "gui")
-            end
-
             -- Fetch colors
             local tree_fg = get_color("NvimTreeNormal", "fg")
-            local tree_bg = get_color("NvimTreeNormal", "bg")
-            local default_color = get_color "@text"
+            local tree_bg = get_color("NvimTreeEndOfBuffer", "bg")
+            local default_color = get_color "Normal"
 
             -- Config
             local config = {
@@ -2070,25 +2176,26 @@ require("lazy").setup({
                 color = function()
                     -- auto change color according to neovims mode
 
+                    -- TODO: Move these out to theme highlights
                     local mode_color = {
                         n = default_color, -- Normal mode
-                        i = get_color "DevIconClojureC", -- Insert mode
-                        v = get_color "NvimTreeSpecialFile", -- Visual mode
-                        [""] = get_color "NvimTreeSpecialFile", -- Visual Block mode
-                        V = get_color "NvimTreeSpecialFile", -- Line Visual mode
+                        i = get_color "DevIconCsv", -- Insert mode
+                        v = get_color "DevIconJavaScriptReactSpec", -- Visual mode
+                        [""] = get_color "DevIconJavaScriptReactSpec", -- Visual Block mode
+                        V = get_color "DevIconJavaScriptReactSpec", -- Line Visual mode
                         c = get_color "TodoFgTODO", -- Command-line mode
-                        no = get_color "NvimTreeSpecialFile", -- Operator-pending mode
+                        no = get_color "DevIconJavaScriptReactSpec", -- Operator-pending mode
                         s = get_color "DevIconClojureC", -- Select mode
                         S = get_color "DevIconClojureC", -- Line Select mode
-                        [""] = get_color "NvimTreeSpecialFile", -- Select Block mode
+                        [""] = get_color "DevIconJavaScriptReactSpec", -- Select Block mode
                         ic = get_color "TodoFgTODO", -- Insert mode completion
                         R = get_color "DevIconClojureC", -- Replace mode
                         Rv = get_color "DevIconClojureC", -- Virtual Replace mode
                         cv = get_color "TodoFgTODO", -- Command-line window mode
                         ce = get_color "TodoFgTODO", -- Normal Ex mode
-                        r = get_color "NvimTreeSpecialFile", -- Hit-enter prompt
-                        rm = get_color "NvimTreeSpecialFile", -- More-prompt
-                        ["r?"] = get_color "NvimTreeSpecialFile", -- Confirm-prompt
+                        r = get_color "DevIconJavaScriptReactSpec", -- Hit-enter prompt
+                        rm = get_color "DevIconJavaScriptReactSpec", -- More-prompt
+                        ["r?"] = get_color "DevIconJavaScriptReactSpec", -- Confirm-prompt
                         ["!"] = get_color "TodoFgTODO", -- Shell mode
                         t = get_color "TodoFgTODO", -- Terminal mode
                     }
@@ -2123,13 +2230,14 @@ require("lazy").setup({
                 function()
                     return vim.fn.expand "%:t"
                 end,
-                -- color = function()
-                --     if git_current_file_modified() then
-                --         return { fg = get_color "NvimTreeGitDirty" }
-                --     else
-                --         return { fg = default_color }
-                --     end
-                -- end,
+                color = function()
+                    local sign_status = vim.b[vim.api.nvim_get_current_buf()].gitsigns_status
+                    if sign_status ~= nil and #sign_status > 0 then
+                        return { fg = get_color "NvimTreeGitDirty" }
+                    else
+                        return { fg = default_color }
+                    end
+                end,
                 padding = { left = -1, right = 1 },
             }
 
