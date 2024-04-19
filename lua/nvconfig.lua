@@ -5,9 +5,22 @@ M.ui = {
     -- hl = highlights
     hl_add = {},
     hl_override = {},
-    changed_themes = {},
+    changed_themes = {
+        -- "onedark"
+    },
     theme_toggle = {},
     -- https://nvchad.com/themes/
+    -- chadracula
+    -- monekai
+    -- material-darker
+    -- nightowl
+    -- oceanic-next
+    -- onedark
+    -- rosepine
+    -- solarized_dark
+    -- vscode_dark
+    -- wombat
+    -- oxocarbon
     theme = "onedark", -- default theme
     transparency = false,
 
@@ -33,7 +46,8 @@ M.ui = {
 }
 
 M.base46 = {
-    integrations = {},
+    integrations = {
+    },
 }
 
 return M

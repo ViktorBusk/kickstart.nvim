@@ -434,7 +434,7 @@ function AdjustSignColumns()
 
     for _, window in ipairs(non_floating_wins) do
         local x_pos = vim.api.nvim_win_get_position(window)[2]
-        if maybe_sign_column and x_pos <= 0 then
+        if maybe_sign_column and x_pos == 0 then
             vim.api.nvim_win_set_option(window, "signcolumn", "yes:5")
         else
             vim.api.nvim_win_set_option(window, "signcolumn", "yes:1")
@@ -545,8 +545,6 @@ vim.api.nvim_create_autocmd("QuitPre", {
         end
     end,
 })
-
-local nvchad = {}
 
 -- [[ Install `lazy.nvim` plugin manager ]]
 --    See `:help lazy.nvim.txt` or https://github.com/folke/lazy.nvim for more info
@@ -762,12 +760,32 @@ require("lazy").setup({
                 opts = {
                     override_by_filename = {
                         [".clang-format"] = {
-                            icon = "",
-                            color = "#801b37",
+                            icon = "󰉶",
+                            color = "#f04187",
                             name = "nf-fa-dragon",
                         },
                     },
                     override_by_extension = {
+                        ["exe"] = {
+                            icon = "",
+                            color = "#71c404",
+                            name = "nf-dev-terminal",
+                        },
+                        ["bash"] = {
+                            icon = "",
+                            color = "#71c404",
+                            name = "nf-dev-terminal",
+                        },
+                        ["sh"] = {
+                            icon = "",
+                            color = "#71c404",
+                            name = "nf-dev-terminal",
+                        },
+                        ["bat"] = {
+                            icon = "",
+                            color = "#71c404",
+                            name = "nf-dev-terminal",
+                        },
                         ["sln"] = {
                             icon = "󰘐",
                             color = "#B75FF4",
@@ -783,24 +801,29 @@ require("lazy").setup({
                             color = "#B75FF4",
                             name = "nf-md-microsoft_visual_studio",
                         },
+                        ["pdb"] = {
+                            icon = "󰘐",
+                            color = "#B75FF4",
+                            name = "nf-md-microsoft_visual_studio",
+                        },
                         ["vert"] = {
-                            icon = "󰇟",
-                            color = "#f2a10a",
+                            icon = "󰘷",
+                            color = "#3fd994",
                             name = "nf-md-drawing_box",
                         },
                         ["frag"] = {
-                            icon = "󰇟",
-                            color = "#f2a10a",
+                            icon = "󰘷",
+                            color = "#3fd994",
                             name = "nf-md-drawing_box",
                         },
                         ["comp"] = {
-                            icon = "󰇟",
-                            color = "#f2a10a",
+                            icon = "󰘷",
+                            color = "#3fd994",
                             name = "nf-md-drawing_box",
                         },
                         ["geom"] = {
-                            icon = "󰇟",
-                            color = "#f2a10a",
+                            icon = "󰘷",
+                            color = "#3fd994",
                             name = "nf-md-drawing_box",
                         },
                     },
@@ -1034,6 +1057,11 @@ require("lazy").setup({
                             callback = vim.lsp.buf.clear_references,
                         })
                     end
+
+                    -- Turn of sematic tokens
+                    -- if vim.g.using_base46 then
+                    --     client.server_capabilities.semanticTokensProvider = nil
+                    -- end
                 end,
             })
 
@@ -1352,14 +1380,14 @@ require("lazy").setup({
                     behavior = cmp.ConfirmBehavior.Replace,
                     select = false,
                 },
-                matching = {
-                    disallow_fuzzy_matching = true,
-                    disallow_fullfuzzy_matching = true,
-                    disallow_partial_fuzzy_matching = true,
-                    disallow_partial_matching = true,
-                    disallow_prefix_unmatching = false,
-                    disallow_symbol_nonprefix_matching = false,
-                },
+                -- matching = {
+                --     disallow_fuzzy_matching = true,
+                --     disallow_fullfuzzy_matching = true,
+                --     disallow_partial_fuzzy_matching = true,
+                --     disallow_partial_matching = true,
+                --     disallow_prefix_unmatching = false,
+                --     disallow_symbol_nonprefix_matching = false,
+                -- },
                 experimental = {
                     ghost_text = {
                         -- hl_group = "LineNr",
@@ -1447,15 +1475,14 @@ require("lazy").setup({
         priority = 1000,
         enabled = true,
         init = function()
+            vim.g.using_base46 = true
             vim.g.base46_cache = vim.fn.stdpath "config" .. "/nvcache/"
+
+            -- vim.highlight.priorities.semantic_tokens = 95
             require("base46").load_all_highlights()
 
             local buffer_bg_color = get_color("Normal", "bg")
             vim.api.nvim_set_hl(0, "WinSeparator", { fg = buffer_bg_color, bg = buffer_bg_color })
-
-            -- vim.api.nvim_set_hl(0, "Statusline", { link = "NvimTreeWinSeparator" })
-            -- vim.api.nvim_set_hl(0, "StatusLineNC", { link = "NvimTreeWinSeparator" })
-            -- vim.api.nvim_set_hl(0, "NvimTreeStatusLineNC", { link = "NvimTreeWinSeparator" })
 
             vim.api.nvim_set_hl(0, "Statusline", { link = "NvimTreeWinSeparator" })
             vim.api.nvim_set_hl(0, "StatusLineNC", { link = "NvimTreeWinSeparator" })
@@ -1467,6 +1494,58 @@ require("lazy").setup({
             vim.api.nvim_set_hl(0, "LspReferenceRead", { link = "Visual" })
             vim.api.nvim_set_hl(0, "LspReferenceWrite", { link = "Visual" })
             vim.api.nvim_set_hl(0, "LspReferenceText", { link = "Visual" })
+
+            local cyan = { link = "@string.escape" }
+
+            vim.api.nvim_set_hl(0, "Variable", { link = "@text" })
+            vim.api.nvim_set_hl(0, "@variable", { link = "@text" })
+            vim.api.nvim_set_hl(0, "@variable.builtin", cyan)
+            vim.api.nvim_set_hl(0, "@lsp.type.variable", { link = "@text" })
+            vim.api.nvim_set_hl(0, "@variable.parameter", { fg = get_color "@constant.builtin", italic = true })
+            vim.api.nvim_set_hl(0, "@lsp.type.parameter", { link = "@text" })
+            vim.api.nvim_set_hl(0, "@lsp.typemod.parameter.declaration", { link = "@constant.builtin" })
+
+            vim.api.nvim_set_hl(0, "Type", cyan)
+            vim.api.nvim_set_hl(0, "StorageClass", cyan)
+            vim.api.nvim_set_hl(0, "@type.builtin", { link = "@keyword.storage" })
+            vim.api.nvim_set_hl(0, "@lsp.type.class", cyan)
+            vim.api.nvim_set_hl(0, "@lsp.type", cyan)
+            vim.api.nvim_set_hl(0, "@lsp.typemod.variable.readonly", { link = "@variable" })
+            vim.api.nvim_set_hl(0, "@lsp.type.type", { link = "@lsp" })
+
+            vim.api.nvim_set_hl(0, "@keyword.operator", { link = "@conditional" })
+            vim.api.nvim_set_hl(0, "@lsp.type.operator", { link = "@keyword.operator" })
+            vim.api.nvim_set_hl(0, "@operator", { link = "@keyword.operator" })
+            vim.api.nvim_set_hl(0, "@punctuation.bracket", { link = "@punctuation.delimiter" })
+
+            vim.api.nvim_set_hl(0, "Constant", { link = "@lsp.type.macro" })
+            vim.api.nvim_set_hl(0, "@constant", { link = "@lsp.type.macro" })
+            vim.api.nvim_set_hl(0, "@constant.macro", { link = "@lsp.type.macro" })
+
+            vim.api.nvim_set_hl(0, "@lsp.type.macro", { link = "CmpItemKindValue" })
+            vim.api.nvim_set_hl(0, "@keyword.directive", { link = "@keyword.operator" })
+            vim.api.nvim_set_hl(0, "@keyword.import", { link = "@keyword.directive" })
+
+            vim.api.nvim_set_hl(0, "@keyword.repeat", { link = "@keyword.operator" })
+            vim.api.nvim_set_hl(0, "@keyword.operator", { link = "@conditional" })
+
+            vim.api.nvim_set_hl(0, "@namespace", { link = "@conditional" })
+            vim.api.nvim_set_hl(0, "@module", { link = "@namespace" })
+            vim.api.nvim_set_hl(0, "@lsp.type.namespace", { link = "@namespace" })
+
+            -- vim.api.nvim_set_hl(0, "Function", cyan)
+            -- vim.api.nvim_set_hl(0, "@function", cyan)
+            -- vim.api.nvim_set_hl(0, "@lsp.type.function", cyan)
+            -- vim.api.nvim_set_hl(0, "@lsp.type.method", cyan)
+            -- vim.api.nvim_set_hl(0, "@function", cyan)
+            -- vim.api.nvim_set_hl(0, "@function.builtin", cyan)
+            -- vim.api.nvim_set_hl(0, "@function.call", cyan)
+            -- vim.api.nvim_set_hl(0, "@function.macro", { link = "@keyword"} )
+            -- vim.api.nvim_set_hl(0, "@function.method", cyan)
+            -- vim.api.nvim_set_hl(0, "@function.method.call", cyan)
+            -- vim.api.nvim_set_hl(0, "@lsp.type.function", cyan)
+            -- vim.api.nvim_set_hl(0, "@lsp.type.function", cyan)
+            -- vim.api.nvim_set_hl(0 ,"CmpItemKindFunction", cyan)
 
             vim.cmd.highlight "DiagnosticUnderlineError gui=undercurl"
             vim.cmd.highlight "DiagnosticUnderlineWarn gui=undercurl"
@@ -1486,6 +1565,7 @@ require("lazy").setup({
     },
     {
         "HiPhish/rainbow-delimiters.nvim",
+        enabled = false,
         config = function()
             require("rainbow-delimiters.setup").setup {}
         end,
