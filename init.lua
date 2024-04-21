@@ -336,9 +336,34 @@ end, { desc = "Config Files" })
 
 -- C/C++ Project specific keybinding for building
 
+-- TODO: DRY
 vim.keymap.set("n", "<c-s-b>", function()
     local cmd = ".\\build.bat vs2022 debug run"
     _MS_BUILD_TOGGLE(cmd)
+end)
+
+vim.keymap.set("n", "<c-s-d>", function()
+    if vim.fn.has "win32" == 0 then
+        error "Only Win32 supported"
+        return
+    end
+
+    local root_patterns = { ".git", ".clang-format", "build.bat", "build.sh" }
+    local root_dir = vim.fs.dirname(vim.fs.find(root_patterns, { upward = true })[1])
+
+    -- Build file not found
+    if root_dir == nil then
+        error "Build file not found"
+        return
+    end
+
+    local paths = vim.split(vim.fn.glob(root_dir .. "\\*.sln"), "\n")
+
+    -- NOTE: This is only working with one sln file
+    for _, path in pairs(paths) do
+        -- Just start the first sln
+        vim.cmd("silent!!start " .. path)
+    end
 end)
 
 -- LSP
