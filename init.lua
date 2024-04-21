@@ -334,6 +334,13 @@ vim.keymap.set("n", "<leader>_", function()
     require("telescope.builtin").find_files { cwd = vim.fn.stdpath "config" }
 end, { desc = "Config Files" })
 
+-- C/C++ Project specific keybinding for building
+
+vim.keymap.set("n", "<c-s-b>", function()
+    local cmd = ".\\build.bat vs2022 debug run"
+    _MS_BUILD_TOGGLE(cmd)
+end)
+
 -- LSP
 local function keymaps_lsp(event)
     local map = function(keys, func, desc)
@@ -418,7 +425,7 @@ function AdjustSignColumns()
     local window_width = vim.api.nvim_win_get_width(vim.api.nvim_get_current_win())
 
     -- Dont use signcolumn if the main window is small enough
-    if window_width < 127 then
+    if window_width < 100 then
         maybe_sign_column = false
     end
 
@@ -751,86 +758,84 @@ require("lazy").setup({
                 end,
             },
             { "nvim-telescope/telescope-ui-select.nvim" },
-
-            -- Useful for getting pretty icons, but requires a Nerd Font.
-            {
-                "nvim-tree/nvim-web-devicons",
-                enabled = vim.g.have_nerd_font,
-                lazy = true,
-                opts = {
-                    override_by_filename = {
-                        [".clang-format"] = {
-                            icon = "󰉶",
-                            color = "#f04187",
-                            name = "nf-fa-dragon",
-                        },
-                    },
-                    override_by_extension = {
-                        ["exe"] = {
-                            icon = "",
-                            color = "#71c404",
-                            name = "nf-dev-terminal",
-                        },
-                        ["bash"] = {
-                            icon = "",
-                            color = "#71c404",
-                            name = "nf-dev-terminal",
-                        },
-                        ["sh"] = {
-                            icon = "",
-                            color = "#71c404",
-                            name = "nf-dev-terminal",
-                        },
-                        ["bat"] = {
-                            icon = "",
-                            color = "#71c404",
-                            name = "nf-dev-terminal",
-                        },
-                        ["sln"] = {
-                            icon = "󰘐",
-                            color = "#B75FF4",
-                            name = "nf-md-microsoft_visual_studio",
-                        },
-                        ["vcxproj"] = {
-                            icon = "󰘐",
-                            color = "#B75FF4",
-                            name = "nf-md-microsoft_visual_studio",
-                        },
-                        ["user"] = {
-                            icon = "󰘐",
-                            color = "#B75FF4",
-                            name = "nf-md-microsoft_visual_studio",
-                        },
-                        ["pdb"] = {
-                            icon = "󰘐",
-                            color = "#B75FF4",
-                            name = "nf-md-microsoft_visual_studio",
-                        },
-                        ["vert"] = {
-                            icon = "󰘷",
-                            color = "#3fd994",
-                            name = "nf-md-drawing_box",
-                        },
-                        ["frag"] = {
-                            icon = "󰘷",
-                            color = "#3fd994",
-                            name = "nf-md-drawing_box",
-                        },
-                        ["comp"] = {
-                            icon = "󰘷",
-                            color = "#3fd994",
-                            name = "nf-md-drawing_box",
-                        },
-                        ["geom"] = {
-                            icon = "󰘷",
-                            color = "#3fd994",
-                            name = "nf-md-drawing_box",
-                        },
+        },
+        {
+            "nvim-tree/nvim-web-devicons",
+            enabled = vim.g.have_nerd_font,
+            lazy = true,
+            opts = {
+                override_by_filename = {
+                    [".clang-format"] = {
+                        icon = "󰉶",
+                        color = "#f04187",
+                        name = "nf-fa-dragon",
                     },
                 },
-                -- HACK: Latest release give errors on windows
-                commit = "5efb8bd",
+                override_by_extension = {
+                    ["exe"] = {
+                        icon = "",
+                        color = "#71c404",
+                        name = "nf-dev-terminal",
+                    },
+                    ["bash"] = {
+                        icon = "",
+                        color = "#71c404",
+                        name = "nf-dev-terminal",
+                    },
+                    ["sh"] = {
+                        icon = "",
+                        color = "#71c404",
+                        name = "nf-dev-terminal",
+                    },
+                    ["bat"] = {
+                        icon = "",
+                        color = "#71c404",
+                        name = "nf-dev-terminal",
+                    },
+                    ["sln"] = {
+                        icon = "󰘐",
+                        color = "#B75FF4",
+                        name = "nf-md-microsoft_visual_studio",
+                    },
+                    ["vcxproj"] = {
+                        icon = "󰘐",
+                        color = "#B75FF4",
+                        name = "nf-md-microsoft_visual_studio",
+                    },
+                    ["user"] = {
+                        icon = "󰘐",
+                        color = "#B75FF4",
+                        name = "nf-md-microsoft_visual_studio",
+                    },
+                    ["pdb"] = {
+                        icon = "󰘐",
+                        color = "#B75FF4",
+                        name = "nf-md-microsoft_visual_studio",
+                    },
+                    ["vert"] = {
+                        icon = "󰘷",
+                        color = "#3fd994",
+                        name = "nf-md-drawing_box",
+                    },
+                    ["frag"] = {
+                        icon = "󰘷",
+                        color = "#3fd994",
+                        name = "nf-md-drawing_box",
+                    },
+                    ["comp"] = {
+                        icon = "󰘷",
+                        color = "#3fd994",
+                        name = "nf-md-drawing_box",
+                    },
+                    ["geom"] = {
+                        icon = "󰘷",
+                        color = "#3fd994",
+                        name = "nf-md-drawing_box",
+                    },
+                },
             },
+            -- HACK: Latest release give errors on windows
+            commit = "5efb8bd",
         },
         -- FIXME: Add personal config
         config = function()
@@ -1391,13 +1396,102 @@ require("lazy").setup({
                 experimental = {
                     ghost_text = {
                         -- hl_group = "LineNr",
-                        hl_group = "TSText",
+                        hl_group = "Comment",
                     },
                 },
             }
         end,
     },
-
+    {
+        "folke/trouble.nvim",
+        branch = "dev",
+        enabled = false,
+        dependencies = { "nvim-tree/nvim-web-devicons" },
+        keys = {
+            -- {
+            --     "<leader>xx",
+            --     "<cmd>Trouble diagnostics toggle<cr>",
+            --     desc = "Diagnostics (Trouble)",
+            -- },
+            -- {
+            --     "<leader>xX",
+            --     "<cmd>Trouble diagnostics toggle filter.buf=0<cr>",
+            --     desc = "Buffer Diagnostics (Trouble)",
+            -- },
+            {
+                "<leader>lt",
+                "<cmd>Trouble symbols toggle<cr>",
+                desc = "Symbols (Trouble)",
+            },
+            {
+                "<leader>lD",
+                "<cmd>Trouble lsp toggle focus=false<cr>",
+                desc = "LSP Definitions / references / ... (Trouble)",
+            },
+            -- {
+            --     "<leader>xL",
+            --     "<cmd>Trouble loclist toggle<cr>",
+            --     desc = "Location List (Trouble)",
+            -- },
+            -- {
+            --     "<leader>xQ",
+            --     "<cmd>Trouble qflist toggle<cr>",
+            --     desc = "Quickfix List (Trouble)",
+            -- },
+        },
+        opts = {
+            modes = {
+                symbols = {
+                    desc = "document symbols",
+                    mode = "lsp_document_symbols",
+                    focus = false,
+                    win = { position = "left", size = 30 },
+                },
+            },
+            icons = {
+                indent = {
+                    top = " ",
+                    middle = " ",
+                    last = " ",
+                    -- last          = "-╴",
+                    -- last       = "╰╴", -- rounded
+                    fold_open = "",
+                    fold_closed = "",
+                    ws = "  ",
+                },
+                default = "",
+                open = "",
+                kinds = {
+                    Array = "",
+                    Boolean = "",
+                    Class = "",
+                    Constant = "",
+                    Constructor = "",
+                    Enum = "",
+                    EnumMember = "",
+                    Event = "",
+                    Field = "",
+                    File = "",
+                    Function = "",
+                    Interface = "",
+                    Key = "",
+                    Method = "",
+                    Module = "",
+                    Namespace = "",
+                    Null = "",
+                    Number = "󰎠",
+                    Object = "",
+                    Operator = "",
+                    Package = "",
+                    Property = "",
+                    String = "",
+                    Struct = "",
+                    TypeParameter = "",
+                    Variable = "",
+                },
+            },
+        },
+    },
     {
         "LunarVim/Colorschemes",
         priority = 1000, -- Make sure to load this before all the other start plugins.
@@ -1444,10 +1538,10 @@ require("lazy").setup({
         -- end,
     },
     {
-        "Nuclear-Squid/photon.nvim",
+        "AxelGard/oneokai.nvim",
         enabled = false,
         config = function()
-            require("photon").load()
+            require("oneokai").load()
         end,
     },
     {
@@ -1522,7 +1616,9 @@ require("lazy").setup({
             vim.api.nvim_set_hl(0, "@constant", { link = "@lsp.type.macro" })
             vim.api.nvim_set_hl(0, "@constant.macro", { link = "@lsp.type.macro" })
 
-            vim.api.nvim_set_hl(0, "@lsp.type.macro", { link = "CmpItemKindValue" })
+            vim.api.nvim_set_hl(0, "@lsp.type.macro", { link = "Function" })
+            vim.api.nvim_set_hl(0, "@function.macro", { link = "Function" })
+            vim.api.nvim_set_hl(0, "@constant.macro", { link = "Function" })
             vim.api.nvim_set_hl(0, "@keyword.directive", { link = "@keyword.operator" })
             vim.api.nvim_set_hl(0, "@keyword.import", { link = "@keyword.directive" })
 
@@ -1552,6 +1648,14 @@ require("lazy").setup({
             vim.cmd.highlight "DiagnosticUnderlineOk gui=undercurl"
             vim.cmd.highlight "DiagnosticUnderlineHint gui=undercurl"
             vim.cmd.highlight "DiagnosticUnderlineInfo gui=undercurl"
+
+            -- dofile(vim.g.base46_cache .. "defaults")
+            --
+            -- local integrations = require("nvconfig").base46.integrations
+            --
+            -- for _, name in ipairs(integrations) do
+            --     dofile(vim.g.base46_cache .. name)
+            -- end
         end,
     },
     {
@@ -1865,7 +1969,7 @@ require("lazy").setup({
             end
 
             vim.cmd "autocmd! TermOpen term://* lua set_terminal_keymaps()"
-            vim.cmd "autocmd! TermOpen term://* set signcolumn=no "
+            vim.cmd "autocmd! TermOpen term://* setlocal signcolumn=no "
 
             local Terminal = require("toggleterm.terminal").Terminal
             local lazygit = Terminal:new { cmd = "lazygit", hidden = true }
@@ -1896,6 +2000,90 @@ require("lazy").setup({
 
             function _PYTHON_TOGGLE()
                 python:toggle()
+            end
+
+            local found_error = false
+            local msbuild = Terminal:new {
+                hidden = true,
+                display_name = "Build",
+                close_on_exit = true,
+                -- stderr does not work with neovim i guess
+                -- parse stdout instead
+                on_stdout = function(t, job, data, name)
+                    if found_error == true then
+                        return
+                    end
+
+                    local stream = ""
+                    for _, line in pairs(data) do
+                        stream = stream .. line
+                        local start_idx, _ = string.find(stream, "): error ")
+                        if start_idx then
+                            local text = ""
+                            local error = nil
+                            for i = start_idx - 1, 1, -1 do
+                                local char = stream:sub(i, i)
+
+                                if error == nil then
+                                    if char == "(" then
+                                        error = text
+                                        text = ""
+                                    end
+                                end
+                                text = char .. text
+                            end
+
+                            -- Remove last (
+                            text = string.sub(text, 1, -2)
+
+                            -- Define a pattern to match Windows paths
+                            local pattern = "([A-Za-z]:\\[^%c%s]+)"
+
+                            local filepath = text:match(pattern)
+                            if vim.fn.filereadable(filepath) == 1 then
+                                found_error = true
+                                local function get_pos(str)
+                                    local l, c = str:match "(%d+),(%d+)"
+                                    return { tonumber(l), tonumber(c) }
+                                end
+                                -- Handle string conversion errors
+                                local valid_pos, pos = pcall(get_pos, error)
+                                if not valid_pos then
+                                    return
+                                end
+                                -- Change focus to the previous window
+                                -- vim.cmd "wincmd p"
+                                -- Open the file
+                                vim.cmd("edit " .. filepath)
+                                -- Move cursor to errror
+                                vim.cmd("normal " .. pos[1] .. "G") -- Move to the specified line
+                                vim.cmd("normal " .. pos[2] .. "|") -- Move to the specified column
+                            end
+                        end
+                    end
+                end,
+            }
+
+            function _MS_BUILD_TOGGLE(cmd)
+                if vim.fn.has "win32" == 0 then
+                    error "Only Win32 supported"
+                    return
+                end
+
+                local root_patterns = { "build.bat", "build.sh" }
+                local root_dir = vim.fs.dirname(vim.fs.find(root_patterns, { upward = true })[1])
+
+                -- Build file not found
+                if root_dir == nil then
+                    error "Build file not found"
+                    return
+                end
+
+                if not msbuild:is_open() then
+                    msbuild:open()
+                end
+                msbuild:send(cmd, true)
+                found_error = false
             end
         end,
     },
@@ -1952,7 +2140,7 @@ require("lazy").setup({
                 view = {
                     adaptive_size = false,
                     centralize_selection = false,
-                    width = 25,
+                    width = 30,
                     side = "left",
                     preserve_window_proportions = false,
                     number = false,
@@ -2350,7 +2538,7 @@ require("lazy").setup({
                 function()
                     local r, c = unpack(vim.api.nvim_win_get_cursor(0))
 
-                    return string.format("Ln %s, Col %s", r, c)
+                    return string.format("Ln %s, Col %s", r, c + 1)
                 end,
             }
 

@@ -21,7 +21,11 @@ M.ui = {
     -- vscode_dark
     -- wombat
     -- oxocarbon
-    theme = "onedark", -- default theme
+    -- dark_horizon
+    -- decay
+    -- doomchad
+
+    theme = "doomchad", -- default theme
     transparency = false,
 
     cmp = {
@@ -35,6 +39,9 @@ M.ui = {
     ------------------------------- nvchad_ui modules -----------------------------
     statusline = {
         theme = "default", -- default/vscode/vscode_colored/minimal
+        separator_style = "default",
+        order = nil,
+        modules = nil,
     },
 
     -- Required tables
@@ -46,8 +53,7 @@ M.ui = {
 }
 
 M.base46 = {
-    integrations = {
-    },
+    integrations = {},
 }
 
 return M
