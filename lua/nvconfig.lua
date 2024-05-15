@@ -25,7 +25,7 @@ M.ui = {
     -- decay
     -- doomchad
 
-    theme = "doomchad", -- default theme
+    theme = "wombat", -- default theme
     transparency = false,
 
     cmp = {

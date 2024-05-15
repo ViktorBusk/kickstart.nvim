@@ -294,8 +294,8 @@ vim.keymap.set("n", "<leader>c", "<cmd>silent!bd!<CR>", { desc = "Close Buffer" 
 
 -- Telescope
 vim.keymap.set("n", "<C-f>", "<cmd>silent!Telescope current_buffer_fuzzy_find<CR>", { desc = "Treesitter symbols" })
-vim.keymap.set("n", "<C-p>", "<cmd>silent!Telescope find_files<CR>", { desc = "Files" })
-vim.keymap.set("n", "<leader>f", "<cmd>silent!Telescope git_files<CR>", { desc = "Files" })
+vim.keymap.set("n", "<C-p>", "<cmd>silent!Telescope git_files<CR>", { desc = "Files" })
+vim.keymap.set("n", "<leader>f", "<cmd>silent!Telescope find_files<CR>", { desc = "Files" })
 vim.keymap.set("n", "<leader>r", "<cmd>silent!Telescope resume<CR>", { desc = "Resume" })
 vim.keymap.set("n", "<leader>R", "<cmd>silent!Telescope oldfiles<CR>", { desc = "Recent files" })
 
@@ -338,7 +338,7 @@ end, { desc = "Config Files" })
 
 -- TODO: DRY
 vim.keymap.set("n", "<c-s-b>", function()
-    local cmd = ".\\build.bat vs2022 debug run"
+    local cmd = '.\\build.bat vs2022 debug && switch.ps1 "raddbg" && raddbg --ipc run'
     _MS_BUILD_TOGGLE(cmd)
 end)
 
@@ -401,7 +401,7 @@ vim.cmd [[
           autocmd TextYankPost * silent!lua require('vim.highlight').on_yank({timeout = 200})
           autocmd BufWinEnter * :set formatoptions-=cro
           autocmd FileType qf set nobuflisted
-          autocmd WinResized * lua AdjustSignColumns()
+          autocmd WinResized,TermOpen,TermClose,TermLeave,TermEnter * lua AdjustSignColumns()
       augroup end
 
       augroup _git
@@ -457,7 +457,7 @@ function AdjustSignColumns()
     local non_floating_wins = vim.fn.filter(vim.api.nvim_list_wins(), function(k, v)
         -- Dont use signcolumn if nvim-tree is open
         local bufname = vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(v))
-        if bufname:match "NvimTree_" ~= nil then
+        if bufname:match "NvimTree_" ~= nil or bufname:match "term://" ~= nil then
             maybe_sign_column = false
         end
 
@@ -1401,8 +1401,8 @@ require("lazy").setup({
                 },
                 sources = {
                     { name = "path", keyword_length = 1 },
-                    { name = "nvim_lsp", max_item_count = 5, keyword_length = 1 },
-                    { name = "luasnip", keyword_length = 1 },
+                    { name = "nvim_lsp", keyword_length = 1 },
+                    { name = "luasnip", keyword_length = 2 },
                     { name = "buffer", max_item_count = 3, keyword_length = 1 },
                     { name = "nvim_lsp_signature_help", keyword_length = 1 },
                 },
@@ -1429,93 +1429,93 @@ require("lazy").setup({
     },
     {
         "folke/trouble.nvim",
-        branch = "dev",
-        enabled = false,
+        -- branch = "dev",
+        enabled = true,
         dependencies = { "nvim-tree/nvim-web-devicons" },
-        keys = {
-            -- {
-            --     "<leader>xx",
-            --     "<cmd>Trouble diagnostics toggle<cr>",
-            --     desc = "Diagnostics (Trouble)",
-            -- },
-            -- {
-            --     "<leader>xX",
-            --     "<cmd>Trouble diagnostics toggle filter.buf=0<cr>",
-            --     desc = "Buffer Diagnostics (Trouble)",
-            -- },
-            {
-                "<leader>lt",
-                "<cmd>Trouble symbols toggle<cr>",
-                desc = "Symbols (Trouble)",
-            },
-            {
-                "<leader>lD",
-                "<cmd>Trouble lsp toggle focus=false<cr>",
-                desc = "LSP Definitions / references / ... (Trouble)",
-            },
-            -- {
-            --     "<leader>xL",
-            --     "<cmd>Trouble loclist toggle<cr>",
-            --     desc = "Location List (Trouble)",
-            -- },
-            -- {
-            --     "<leader>xQ",
-            --     "<cmd>Trouble qflist toggle<cr>",
-            --     desc = "Quickfix List (Trouble)",
-            -- },
-        },
-        opts = {
-            modes = {
-                symbols = {
-                    desc = "document symbols",
-                    mode = "lsp_document_symbols",
-                    focus = false,
-                    win = { position = "left", size = 30 },
-                },
-            },
-            icons = {
-                indent = {
-                    top = " ",
-                    middle = " ",
-                    last = " ",
-                    -- last          = "-╴",
-                    -- last       = "╰╴", -- rounded
-                    fold_open = "",
-                    fold_closed = "",
-                    ws = "  ",
-                },
-                default = "",
-                open = "",
-                kinds = {
-                    Array = "",
-                    Boolean = "",
-                    Class = "",
-                    Constant = "",
-                    Constructor = "",
-                    Enum = "",
-                    EnumMember = "",
-                    Event = "",
-                    Field = "",
-                    File = "",
-                    Function = "",
-                    Interface = "",
-                    Key = "",
-                    Method = "",
-                    Module = "",
-                    Namespace = "",
-                    Null = "",
-                    Number = "󰎠",
-                    Object = "",
-                    Operator = "",
-                    Package = "",
-                    Property = "",
-                    String = "",
-                    Struct = "",
-                    TypeParameter = "",
-                    Variable = "",
-                },
-            },
-        },
+        --     keys = {
+        --         -- {
+        --         --     "<leader>xx",
+        --         --     "<cmd>Trouble diagnostics toggle<cr>",
+        --         --     desc = "Diagnostics (Trouble)",
+        --         -- },
+        --         -- {
+        --         --     "<leader>xX",
+        --         --     "<cmd>Trouble diagnostics toggle filter.buf=0<cr>",
+        --         --     desc = "Buffer Diagnostics (Trouble)",
+        --         -- },
+        --         {
+        --             "<leader>lt",
+        --             "<cmd>Trouble symbols toggle<cr>",
+        --             desc = "Symbols (Trouble)",
+        --         },
+        --         {
+        --             "<leader>lD",
+        --             "<cmd>Trouble lsp toggle focus=false<cr>",
+        --             desc = "LSP Definitions / references / ... (Trouble)",
+        --         },
+        --         -- {
+        --         --     "<leader>xL",
+        --         --     "<cmd>Trouble loclist toggle<cr>",
+        --         --     desc = "Location List (Trouble)",
+        --         -- },
+        --         -- {
+        --         --     "<leader>xQ",
+        --         --     "<cmd>Trouble qflist toggle<cr>",
+        --         --     desc = "Quickfix List (Trouble)",
+        --         -- },
+        --     },
+        --     opts = {
+        --         modes = {
+        --             symbols = {
+        --                 desc = "document symbols",
+        --                 mode = "lsp_document_symbols",
+        --                 focus = false,
+        --                 win = { position = "left", size = 30 },
+        --             },
+        --         },
+        --         icons = {
+        --             indent = {
+        --                 top = " ",
+        --                 middle = " ",
+        --                 last = " ",
+        --                 -- last          = "-╴",
+        --                 -- last       = "╰╴", -- rounded
+        --                 fold_open = "",
+        --                 fold_closed = "",
+        --                 ws = "  ",
+        --             },
+        --             default = "",
+        --             open = "",
+        --             kinds = {
+        --                 Array = "",
+        --                 Boolean = "",
+        --                 Class = "",
+        --                 Constant = "",
+        --                 Constructor = "",
+        --                 Enum = "",
+        --                 EnumMember = "",
+        --                 Event = "",
+        --                 Field = "",
+        --                 File = "",
+        --                 Function = "",
+        --                 Interface = "",
+        --                 Key = "",
+        --                 Method = "",
+        --                 Module = "",
+        --                 Namespace = "",
+        --                 Null = "",
+        --                 Number = "󰎠",
+        --                 Object = "",
+        --                 Operator = "",
+        --                 Package = "",
+        --                 Property = "",
+        --                 String = "",
+        --                 Struct = "",
+        --                 TypeParameter = "",
+        --                 Variable = "",
+        --             },
+        --         },
+        --     },
     },
     {
         "LunarVim/Colorschemes",
@@ -1618,7 +1618,7 @@ require("lazy").setup({
 
             vim.api.nvim_set_hl(0, "Variable", { link = "@text" })
             vim.api.nvim_set_hl(0, "@variable", { link = "@text" })
-            vim.api.nvim_set_hl(0, "@variable.builtin", cyan)
+            vim.api.nvim_set_hl(0, "@variable.builtin", { link = "@keyword" })
             vim.api.nvim_set_hl(0, "@lsp.type.variable", { link = "@text" })
             vim.api.nvim_set_hl(0, "@variable.parameter", { fg = get_color "@constant.builtin", italic = true })
             vim.api.nvim_set_hl(0, "@lsp.type.parameter", { link = "@text" })
@@ -1626,11 +1626,11 @@ require("lazy").setup({
 
             vim.api.nvim_set_hl(0, "Type", cyan)
             vim.api.nvim_set_hl(0, "StorageClass", cyan)
-            vim.api.nvim_set_hl(0, "@type.builtin", { link = "@keyword.storage" })
+            vim.api.nvim_set_hl(0, "@type.builtin", cyan)
             vim.api.nvim_set_hl(0, "@lsp.type.class", cyan)
             vim.api.nvim_set_hl(0, "@lsp.type", cyan)
             vim.api.nvim_set_hl(0, "@lsp.typemod.variable.readonly", { link = "@variable" })
-            vim.api.nvim_set_hl(0, "@lsp.type.type", { link = "@lsp" })
+            vim.api.nvim_set_hl(0, "@lsp.type.type", cyan)
 
             vim.api.nvim_set_hl(0, "@keyword.operator", { link = "@conditional" })
             vim.api.nvim_set_hl(0, "@lsp.type.operator", { link = "@keyword.operator" })
@@ -1639,13 +1639,14 @@ require("lazy").setup({
 
             vim.api.nvim_set_hl(0, "Constant", { link = "@lsp.type.macro" })
             vim.api.nvim_set_hl(0, "@constant", { link = "@lsp.type.macro" })
-            vim.api.nvim_set_hl(0, "@constant.macro", { link = "@lsp.type.macro" })
 
-            vim.api.nvim_set_hl(0, "@lsp.type.macro", { link = "Function" })
-            vim.api.nvim_set_hl(0, "@function.macro", { link = "Function" })
-            vim.api.nvim_set_hl(0, "@constant.macro", { link = "Function" })
+            vim.api.nvim_set_hl(0, "@lsp.type.macro", { link = "@number" })
+            vim.api.nvim_set_hl(0, "@function.macro", { link = "@number" })
+            vim.api.nvim_set_hl(0, "@constant.macro", { link = "@number" })
+
             vim.api.nvim_set_hl(0, "@keyword.directive", { link = "@keyword.operator" })
             vim.api.nvim_set_hl(0, "@keyword.import", { link = "@keyword.directive" })
+            vim.api.nvim_set_hl(0, "@keyword.exception", { link = "@keyword" })
 
             vim.api.nvim_set_hl(0, "@keyword.repeat", { link = "@keyword.operator" })
             vim.api.nvim_set_hl(0, "@keyword.operator", { link = "@conditional" })
@@ -1961,7 +1962,7 @@ require("lazy").setup({
             local toggle_term = require "toggleterm"
 
             toggle_term.setup {
-                size = 115,
+                size = 145,
                 open_mapping = [[<c-t>]],
                 hide_numbers = true,
                 shade_filetypes = {},
@@ -2042,10 +2043,12 @@ require("lazy").setup({
                     local stream = ""
                     for _, line in pairs(data) do
                         stream = stream .. line
-                        local start_idx, _ = string.find(stream, "): error ")
+                        -- look for: error C12345
+                        local start_idx, _ = string.find(stream, "%serror%s[A-Z0-9]+:%s")
                         if start_idx then
                             local text = ""
                             local error = nil
+                            -- loop backwards and find the first "("
                             for i = start_idx - 1, 1, -1 do
                                 local char = stream:sub(i, i)
 
