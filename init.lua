@@ -144,9 +144,10 @@ vim.g.neovide_transparency = 1.0
 vim.g.neovide_floating_opacity = 0.4
 vim.g.neovide_floating_blur = true
 vim.g.neovide_remember_window_size = true
-vim.g.neovide_scale_factor = 1.5
--- vim.g.neovide_cursor_animation_length = 0.035
--- vim.g.neovide_scroll_animation_length = 0.28
+vim.g.neovide_scale_factor = 1.20
+
+vim.g.neovide_cursor_animation_length = 0.045
+vim.g.neovide_scroll_animation_length = 0.25
 vim.g.neovide_cursor_animate_command_line = true
 -- vim.cmd [[ set guicursor=i:ver25-blinkwait10-blinkon500-blinkoff500 ]]
 -- vim.g.neovide_cursor_smooth_blink = false
@@ -204,6 +205,8 @@ vim.cmd [[
      nnoremap n nzzzv
      nnoremap N Nzzzv
  ]]
+
+vim.keymap.set("n", "<C-d>", "<C-d>zz", { desc = "Center cursor after moving down half-page" })
 
 vim.cmd "set whichwrap+=<,>,[,],h,l"
 vim.cmd [[set iskeyword+=-]]
@@ -338,7 +341,7 @@ end, { desc = "Config Files" })
 
 -- TODO: DRY
 vim.keymap.set("n", "<c-s-b>", function()
-    local cmd = '.\\build.bat vs2022 debug && switch.ps1 "raddbg" && raddbg --ipc run'
+    local cmd = ".\\build.bat vs2022 debug run raddbg"
     _MS_BUILD_TOGGLE(cmd)
 end)
 
@@ -385,9 +388,9 @@ local function keymaps_lsp(event)
     map("gD", vim.lsp.buf.declaration, "Goto declaration")
     map("<C-i>", vim.lsp.buf.signature_help, "Signatre help")
 
-    vim.keymap.set("n", "<leader>lr", function()
-        return ":IncRename " -- .. vim.fn.expand "<cword>"
-    end, { expr = true, desc = { "Rename" } })
+    -- vim.keymap.set("n", "<leader>lr", function()
+    --     return ":IncRename " -- .. vim.fn.expand "<cword>"
+    -- end, { expr = true, desc = { "Rename" } })
 end
 
 -- [[ Basic Autocommands ]]
@@ -401,7 +404,7 @@ vim.cmd [[
           autocmd TextYankPost * silent!lua require('vim.highlight').on_yank({timeout = 200})
           autocmd BufWinEnter * :set formatoptions-=cro
           autocmd FileType qf set nobuflisted
-          autocmd WinResized,TermOpen,TermClose,TermLeave,TermEnter * lua AdjustSignColumns()
+          autocmd BufEnter,WinResized,TermOpen,TermClose,TermLeave,TermEnter * lua AdjustSignColumns()
       augroup end
 
       augroup _git
@@ -457,7 +460,7 @@ function AdjustSignColumns()
     local non_floating_wins = vim.fn.filter(vim.api.nvim_list_wins(), function(k, v)
         -- Dont use signcolumn if nvim-tree is open
         local bufname = vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(v))
-        if bufname:match "NvimTree_" ~= nil or bufname:match "term://" ~= nil then
+        if bufname:match "NvimTree_" ~= nil then
             maybe_sign_column = false
         end
 
@@ -467,9 +470,9 @@ function AdjustSignColumns()
     for _, window in ipairs(non_floating_wins) do
         local x_pos = vim.api.nvim_win_get_position(window)[2]
         if maybe_sign_column and x_pos == 0 then
-            vim.api.nvim_win_set_option(window, "signcolumn", "yes:5")
+            vim.api.nvim_set_option_value("signcolumn", "yes:5", { scope = "local", win = window })
         else
-            vim.api.nvim_win_set_option(window, "signcolumn", "yes:1")
+            vim.api.nvim_set_option_value("signcolumn", "yes:1", { scope = "local", win = window })
         end
     end
 end
@@ -860,7 +863,7 @@ require("lazy").setup({
                 },
             },
             -- HACK: Latest release give errors on windows
-            commit = "5efb8bd",
+            -- commit = "5efb8bd",
         },
         -- FIXME: Add personal config
         config = function()
@@ -1591,6 +1594,7 @@ require("lazy").setup({
     },
     {
         "NvChad/base46",
+        commit = "b48abea",
         priority = 1000,
         enabled = true,
         init = function()
@@ -1632,7 +1636,7 @@ require("lazy").setup({
             vim.api.nvim_set_hl(0, "@lsp.typemod.variable.readonly", { link = "@variable" })
             vim.api.nvim_set_hl(0, "@lsp.type.type", cyan)
 
-            vim.api.nvim_set_hl(0, "@keyword.operator", { link = "@conditional" })
+            vim.api.nvim_set_hl(0, "@keyword.operator", { link = "@keyword.conditional" })
             vim.api.nvim_set_hl(0, "@lsp.type.operator", { link = "@keyword.operator" })
             vim.api.nvim_set_hl(0, "@operator", { link = "@keyword.operator" })
             vim.api.nvim_set_hl(0, "@punctuation.bracket", { link = "@punctuation.delimiter" })
@@ -1649,11 +1653,14 @@ require("lazy").setup({
             vim.api.nvim_set_hl(0, "@keyword.exception", { link = "@keyword" })
 
             vim.api.nvim_set_hl(0, "@keyword.repeat", { link = "@keyword.operator" })
-            vim.api.nvim_set_hl(0, "@keyword.operator", { link = "@conditional" })
+            vim.api.nvim_set_hl(0, "@keyword.operator", { link = "@keyword.conditional" })
 
-            vim.api.nvim_set_hl(0, "@namespace", { link = "@conditional" })
+            vim.api.nvim_set_hl(0, "@namespace", { link = "@keyword.conditional" })
             vim.api.nvim_set_hl(0, "@module", { link = "@namespace" })
             vim.api.nvim_set_hl(0, "@lsp.type.namespace", { link = "@namespace" })
+
+            vim.api.nvim_set_hl(0, "Search", { link = "IncSearch" })
+            vim.api.nvim_set_hl(0, "CurSearch", { link = "IncSearch" })
 
             -- vim.api.nvim_set_hl(0, "Function", cyan)
             -- vim.api.nvim_set_hl(0, "@function", cyan)
@@ -1668,12 +1675,11 @@ require("lazy").setup({
             -- vim.api.nvim_set_hl(0, "@lsp.type.function", cyan)
             -- vim.api.nvim_set_hl(0, "@lsp.type.function", cyan)
             -- vim.api.nvim_set_hl(0 ,"CmpItemKindFunction", cyan)
-
-            vim.cmd.highlight "DiagnosticUnderlineError gui=undercurl"
-            vim.cmd.highlight "DiagnosticUnderlineWarn gui=undercurl"
-            vim.cmd.highlight "DiagnosticUnderlineOk gui=undercurl"
-            vim.cmd.highlight "DiagnosticUnderlineHint gui=undercurl"
-            vim.cmd.highlight "DiagnosticUnderlineInfo gui=undercurl"
+            vim.cmd.highlight("DiagnosticUnderlineError guisp=" .. get_color("DiagnosticError", "fg") .. " gui=undercurl")
+            vim.cmd.highlight("DiagnosticUnderlineWarn guisp=" .. get_color("DiagnosticWarn", "fg") .. " gui=undercurl")
+            vim.cmd.highlight("DiagnosticUnderlineOk guisp=" .. get_color("DiagnosticOk", "fg") .. " gui=undercurl")
+            vim.cmd.highlight("DiagnosticUnderlineHint guisp=" .. get_color("DiagnosticHint", "fg") .. " gui=undercurl")
+            vim.cmd.highlight("DiagnosticUnderlineInfo guisp=" .. get_color("DiagnosticInfo", "fg") .. " gui=undercurl")
 
             -- dofile(vim.g.base46_cache .. "defaults")
             --
@@ -1962,7 +1968,7 @@ require("lazy").setup({
             local toggle_term = require "toggleterm"
 
             toggle_term.setup {
-                size = 145,
+                size = 120,
                 open_mapping = [[<c-t>]],
                 hide_numbers = true,
                 shade_filetypes = {},
@@ -2572,7 +2578,7 @@ require("lazy").setup({
 
             ins_right {
                 function()
-                    return "Spaces:" .. vim.api.nvim_buf_get_option(0, "shiftwidth")
+                    return "Spaces:" .. vim.api.nvim_get_option_value("shiftwidth", { buf = 0 })
                 end,
             }
 
