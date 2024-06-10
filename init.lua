@@ -146,7 +146,7 @@ vim.g.neovide_floating_blur = true
 vim.g.neovide_remember_window_size = true
 vim.g.neovide_scale_factor = 1.20
 
-vim.g.neovide_cursor_animation_length = 0.045
+vim.g.neovide_cursor_animation_length = 0
 vim.g.neovide_scroll_animation_length = 0.25
 vim.g.neovide_cursor_animate_command_line = true
 -- vim.cmd [[ set guicursor=i:ver25-blinkwait10-blinkon500-blinkoff500 ]]
@@ -341,7 +341,7 @@ end, { desc = "Config Files" })
 
 -- TODO: DRY
 vim.keymap.set("n", "<c-s-b>", function()
-    local cmd = ".\\build.bat vs2022 debug run raddbg"
+    local cmd = ".\\build.bat vs2022 debug run vs"
     _MS_BUILD_TOGGLE(cmd)
 end)
 
@@ -371,8 +371,9 @@ end)
 
 -- LSP
 local function keymaps_lsp(event)
-    local map = function(keys, func, desc)
-        vim.keymap.set("n", keys, func, { buffer = event.buf, desc = desc })
+    local map = function(keys, func, desc, expr)
+        expr = expr or false
+        vim.keymap.set("n", keys, func, { buffer = event.buf, desc = desc, expr = expr })
     end
     map("gd", require("telescope.builtin").lsp_definitions, "Goto definition")
     map("gr", require("telescope.builtin").lsp_references, "Goto references")
@@ -381,6 +382,10 @@ local function keymaps_lsp(event)
     map("<leader>ls", require("telescope.builtin").lsp_document_symbols, "Document symbols")
     map("<leader>lS", require("telescope.builtin").lsp_dynamic_workspace_symbols, "Workspace symbols")
     map("<leader>la", vim.lsp.buf.code_action, "Action")
+
+    map("<leader>lr", function()
+        return ":IncRename " --.. vim.fn.expand "<cword>"
+    end, "Rename", true)
 
     map("K", vim.lsp.buf.hover, "Hover hocumentation")
     -- WARN: This is not Goto Definition, this is Goto Declaration.
@@ -830,6 +835,11 @@ require("lazy").setup({
                         color = "#B75FF4",
                         name = "nf-md-microsoft_visual_studio",
                     },
+                    ["filters"] = {
+                        icon = "󰘐",
+                        color = "#B75FF4",
+                        name = "nf-md-microsoft_visual_studio",
+                    },
                     ["user"] = {
                         icon = "󰘐",
                         color = "#B75FF4",
@@ -880,6 +890,10 @@ require("lazy").setup({
                 --  All the info you're looking for is in `:help telescope.setup()`
 
                 defaults = {
+                    exclude = {
+                        "vendor",
+                        "node_modules",
+                    },
                     vimgrep_arguments = {
                         "rg",
                         "--color=never",
@@ -1115,7 +1129,22 @@ require("lazy").setup({
             --  - settings (table): Override the default settings passed when initializing the server.
             --        For example, to see the options for `lua_ls`, you could go to: https://luals.github.io/wiki/settings/
             local servers = {
-                -- clangd = {},
+                clangd = {
+                    cmd = {
+                        "clangd",
+                        "-j=6",
+                        "--background-index",
+                        "--log=verbose",
+                        "--clang-tidy",
+                        "--limit-references=20",
+                        "--limit-results=20",
+                        "--all-scopes-completion=0",
+                        "--function-arg-placeholders=0",
+                        "--header-insertion=never",
+                        "--pch-storage=memory",
+                        "--offset-encoding=utf-16",
+                    },
+                },
                 -- gopls = {},
                 -- pyright = {},
                 -- rust_analyzer = {},
@@ -1594,7 +1623,7 @@ require("lazy").setup({
     },
     {
         "NvChad/base46",
-        commit = "b48abea",
+        -- commit = "b48abea",
         priority = 1000,
         enabled = true,
         init = function()
@@ -1690,6 +1719,119 @@ require("lazy").setup({
             -- end
         end,
     },
+    -- {
+    --     "NvChad/base46",
+    --     -- commit = "b48abea",
+    --     priority = 1000,
+    --     enabled = true,
+    --     init = function()
+    --         vim.g.using_base46 = true
+    --         vim.g.base46_cache = vim.fn.stdpath "config" .. "/nvcache/"
+    --
+    --         -- vim.highlight.priorities.semantic_tokens = 95
+    --         require("base46").load_all_highlights()
+    --
+    --         local buffer_bg_color = get_color("Normal", "bg")
+    --         vim.api.nvim_set_hl(0, "WinSeparator", { fg = buffer_bg_color, bg = buffer_bg_color })
+    --
+    --         vim.api.nvim_set_hl(0, "Statusline", { link = "NvimTreeWinSeparator" })
+    --         vim.api.nvim_set_hl(0, "StatusLineNC", { link = "NvimTreeWinSeparator" })
+    --         vim.api.nvim_set_hl(0, "NvimTreeStatusLineNC", { link = "NvimTreeWinSeparator" })
+    --
+    --         vim.api.nvim_set_hl(0, "TelescopePreviewTitle", { link = "TelescopeBorder" })
+    --         vim.api.nvim_set_hl(0, "TelescopePromptTitle", { link = "CursorLine" })
+    --
+    --         vim.api.nvim_set_hl(0, "LspReferenceRead", { link = "Visual" })
+    --         vim.api.nvim_set_hl(0, "LspReferenceWrite", { link = "Visual" })
+    --         vim.api.nvim_set_hl(0, "LspReferenceText", { link = "Visual" })
+    --
+    --         vim.api.nvim_set_hl(0, "Variable", { fg = "#e7e6df" })
+    --         vim.api.nvim_set_hl(0, "@variable", { link = "Variable" })
+    --         vim.api.nvim_set_hl(0, "@variable.member", { fg = "#ba6135" })
+    --         vim.api.nvim_set_hl(0, "@property", { link = "@variable.member" })
+    --         vim.api.nvim_set_hl(0, "@variable.builtin", { fg = "#5f9182" })
+    --         vim.api.nvim_set_hl(0, "@lsp.type.variable", { link = "@variable" })
+    --         vim.api.nvim_set_hl(0, "@variable.parameter", { fg = get_color "@variable", italic = true })
+    --         vim.api.nvim_set_hl(0, "@lsp.type.parameter", { link = "@text" })
+    --         vim.api.nvim_set_hl(0, "@lsp.typemod.parameter.declaration", { link = "@variable.parameter" })
+    --
+    --         vim.api.nvim_set_hl(0, "Type", { fg = "#a5980c" })
+    --         vim.api.nvim_set_hl(0, "@lsp.type", { fg = "#a5980c" })
+    --         vim.api.nvim_set_hl(0, "StorageClass", { link = "@lsp.type" })
+    --         vim.api.nvim_set_hl(0, "@type.builtin", { fg = "#5f9182" })
+    --         vim.api.nvim_set_hl(0, "@lsp.typemod.type.defaultLibrary", { link = "@type.builtin" })
+    --         vim.api.nvim_set_hl(0, "@lsp.type.class", { link = "@lsp.type" })
+    --         vim.api.nvim_set_hl(0, "@lsp.typemod.variable.readonly", { link = "@variable" })
+    --         vim.api.nvim_set_hl(0, "@lsp.type.type", { link = "@lsp.type" })
+    --         vim.api.nvim_set_hl(0, "@string", { fg = "#7c9725" })
+    --         vim.api.nvim_set_hl(0, "@string.escape", { fg = "#929181" })
+    --
+    --         vim.api.nvim_set_hl(0, "@keyword", { fg = "#5f9182" })
+    --         vim.api.nvim_set_hl(0, "@keyword.operator", { link = "@keyword" })
+    --         vim.api.nvim_set_hl(0, "@lsp.type.operator", { link = "@keyword.operator" })
+    --         vim.api.nvim_set_hl(0, "@operator", { link = "@keyword.operator" })
+    --
+    --         vim.api.nvim_set_hl(0, "@punctuation.delimiter", { fg = "#929181" })
+    --         vim.api.nvim_set_hl(0, "@punctuation.bracket", { link = "@punctuation.delimiter" })
+    --
+    --         vim.api.nvim_set_hl(0, "@lsp.type.macro", { fg = "#7c9725" })
+    --         vim.api.nvim_set_hl(0, "@function.macro", { link = "@lsp.type.macro" })
+    --         vim.api.nvim_set_hl(0, "@constant.macro", { link = "@lsp.type.macro" })
+    --
+    --         vim.api.nvim_set_hl(0, "Number", { fg = "#ae7312" })
+    --         vim.api.nvim_set_hl(0, "@number", { link = "Number" })
+    --
+    --         vim.api.nvim_set_hl(0, "Boolean", { link = "Number" })
+    --         vim.api.nvim_set_hl(0, "@boolean", { link = "Boolean" })
+    --
+    --         vim.api.nvim_set_hl(0, "@lsp.type.enumMember", { link = "@number" })
+    --
+    --         vim.api.nvim_set_hl(0, "Constant", { link = "@lsp.type.macro" })
+    --         vim.api.nvim_set_hl(0, "@constant", { link = "@lsp.type.macro" })
+    --
+    --         vim.api.nvim_set_hl(0, "@keyword.directive", { fg = "#5f9182" })
+    --         vim.api.nvim_set_hl(0, "@keyword.import", { link = "@keyword.directive" })
+    --         vim.api.nvim_set_hl(0, "@keyword.exception", { link = "@keyword" })
+    --
+    --         vim.api.nvim_set_hl(0, "@keyword.conditional", { link = "@keyword" })
+    --         vim.api.nvim_set_hl(0, "@keyword.repeat", { link = "@keyword" })
+    --         vim.api.nvim_set_hl(0, "@keyword.return", { link = "@keyword" })
+    --         vim.api.nvim_set_hl(0, "@keyword.operator", { fg = "#929181" })
+    --
+    --         vim.api.nvim_set_hl(0, "@namespace", { link = "@variable" })
+    --         vim.api.nvim_set_hl(0, "@module", { link = "@namespace" })
+    --         vim.api.nvim_set_hl(0, "@lsp.type.namespace", { link = "@namespace" })
+    --
+    --         vim.api.nvim_set_hl(0, "Search", { bg = "#37a166" })
+    --         vim.api.nvim_set_hl(0, "CurSearch", { link = "Search" })
+    --
+    --         vim.api.nvim_set_hl(0, "Function", { fg = "#35a166" })
+    --         vim.api.nvim_set_hl(0, "@function", { fg = "#35a166" })
+    --         vim.api.nvim_set_hl(0, "@lsp.type.function", { link = "@function" })
+    --         vim.api.nvim_set_hl(0, "@lsp.type.method", { link = "@variable.member" })
+    --         vim.api.nvim_set_hl(0, "@function.builtin", { link = "@function" })
+    --         vim.api.nvim_set_hl(0, "@function.call", { link = "@function" })
+    --         vim.api.nvim_set_hl(0, "@function.method", { link = "@varable" })
+    --         vim.api.nvim_set_hl(0, "@function.method.call", { link = "@varable.member" })
+    --         vim.api.nvim_set_hl(0, "@lsp.type.function", { link = "@function" })
+    --         vim.api.nvim_set_hl(0, "@lsp.type.function", { link = "@function" })
+    --         vim.api.nvim_set_hl(0, "CmpItemKind@function", { link = "@function" })
+    --
+    --         vim.cmd.highlight("DiagnosticUnderlineError guisp=" .. get_color("DiagnosticError", "fg") .. " gui=undercurl")
+    --         vim.cmd.highlight("DiagnosticUnderlineWarn guisp=" .. get_color("DiagnosticWarn", "fg") .. " gui=undercurl")
+    --         vim.cmd.highlight("DiagnosticUnderlineOk guisp=" .. get_color("DiagnosticOk", "fg") .. " gui=undercurl")
+    --         vim.cmd.highlight("DiagnosticUnderlineHint guisp=" .. get_color("DiagnosticHint", "fg") .. " gui=undercurl")
+    --         vim.cmd.highlight("DiagnosticUnderlineInfo guisp=" .. get_color("DiagnosticInfo", "fg") .. " gui=undercurl")
+    --
+    --         -- dofile(vim.g.base46_cache .. "defaults")
+    --         --
+    --         -- local integrations = require("nvconfig").base46.integrations
+    --         --
+    --         -- for _, name in ipairs(integrations) do
+    --         --     dofile(vim.g.base46_cache .. name)
+    --         -- end
+    --     end,
+    -- },
     {
         "wuelnerdotexe/vim-enfocado",
         priority = 1000,
