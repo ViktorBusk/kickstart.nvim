@@ -24,6 +24,7 @@ M.ui = {
     -- dark_horizon
     -- decay
     -- doomchad
+    -- oceanic-next
 
     theme = "wombat", -- default theme
     transparency = false,
@@ -55,5 +56,6 @@ M.ui = {
 M.base46 = {
     integrations = {},
 }
+M.cheatsheet = {}
 
 return M

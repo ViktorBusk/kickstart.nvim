@@ -149,6 +149,7 @@ vim.g.neovide_scale_factor = 1.20
 vim.g.neovide_cursor_animation_length = 0
 vim.g.neovide_scroll_animation_length = 0.25
 vim.g.neovide_cursor_animate_command_line = true
+
 -- vim.cmd [[ set guicursor=i:ver25-blinkwait10-blinkon500-blinkoff500 ]]
 -- vim.g.neovide_cursor_smooth_blink = false
 vim.cmd [[set mousescroll=ver:5,hor:5]]
@@ -341,7 +342,7 @@ end, { desc = "Config Files" })
 
 -- TODO: DRY
 vim.keymap.set("n", "<c-s-b>", function()
-    local cmd = ".\\build.bat vs2022 debug run vs"
+    local cmd = ".\\build.bat vs2022 debug run raddbg"
     _MS_BUILD_TOGGLE(cmd)
 end)
 
@@ -409,7 +410,7 @@ vim.cmd [[
           autocmd TextYankPost * silent!lua require('vim.highlight').on_yank({timeout = 200})
           autocmd BufWinEnter * :set formatoptions-=cro
           autocmd FileType qf set nobuflisted
-          autocmd BufEnter,WinResized,TermOpen,TermClose,TermLeave,TermEnter * lua AdjustSignColumns()
+          " autocmd BufEnter,WinResized,TermOpen,TermClose,TermLeave,TermEnter * lua AdjustSignColumns()
       augroup end
 
       augroup _git
@@ -648,6 +649,7 @@ require("lazy").setup({
     },
     { -- Adds git related signs to the gutter, as well as utilities for managing changes
         "lewis6991/gitsigns.nvim",
+        commit = "720061a",
         opts = {
             signs = {
                 add = { hl = "GitSignsAdd", text = "▎", numhl = "GitSignsAddNr", linehl = "GitSignsAddLn" },
@@ -697,79 +699,25 @@ require("lazy").setup({
     },
     { -- Useful plugin to show you pending keybinds.
         "folke/which-key.nvim",
-        event = "VimEnter", -- Sets the loading event to 'VimEnter'
-        config = function() -- This is the function that runs, AFTER loading
-            local which_key = require "which-key"
-
-            which_key.setup {
-                plugins = {
-                    marks = true, -- shows a list of your marks on ' and `
-                    registers = true, -- shows your registers on " in NORMAL or <C-r> in INSERT mode
-                    spelling = {
-                        enabled = true, -- enabling this will show WhichKey when pressing z= to select spelling suggestions
-                        suggestions = 20, -- how many suggestions should be shown in the list?
-                    },
-                    -- the presets plugin, adds help for a bunch of default keybindings in Neovim
-                    -- No actual key bindings are created
-                    presets = {
-                        operators = false, -- adds help for operators like d, y, ... and registers them for motion / text object completion
-                        motions = true, -- adds help for motions
-                        text_objects = true, -- help for text objects triggered after entering an operator
-                        windows = true, -- default bindings on <c-w>
-                        nav = true, -- misc bindings to work with windows
-                        z = false, -- bindings for folds, spelling and others prefixed with z
-                        g = false, -- bindings for prefixed with g
-                    },
-                },
-                -- add operators that will trigger motion and text object completion
-                -- to enable all native operators, set the preset / operators plugin above
-                -- operators = { gc = "Comments" },
-                key_labels = {
-                    -- override the label used to display some keys. It doesn't effect WK in any other way.
-                    -- For example:
-                    -- ["<space>"] = "SPC",
-                    -- ["<cr>"] = "RET",
-                    -- ["<tab>"] = "TAB",
-                },
-                icons = {
-                    breadcrumb = "»", -- symbol used in the command line area that shows your active key combo
-                    separator = "➜", -- symbol used between a key and it's label
-                    group = "+", -- symbol prepended to a group
-                },
-                popup_appings = {
-                    scroll_down = "<c-d>", -- binding to scroll down inside the popup
-                    scroll_up = "<c-u>", -- binding to scroll up inside the popup
-                },
-                window = {
-                    border = "none", -- none, single, double, shadow
-                    position = "bottom", -- bottom, top
-                    margin = { 1, 0, 1, 0 }, -- extra window margin [top, right, bottom, left]
-                    padding = { 2, 2, 2, 2 }, -- extra window padding [top, right, bottom, left]
-                    winblend = 0,
-                },
-                layout = {
-                    height = { min = 4, max = 25 }, -- min and max height of the columns
-                    width = { min = 20, max = 50 }, -- min and max width of the columns
-                    spacing = 3, -- spacing between columns
-                    align = "left", -- align columns left, center or right
-                },
-                ignore_missing = false, -- enable this to hide mappings for which you didn't specify a label
-                hidden = { "<silent>", "<cmd>", "<Cmd>", "<CR>", "call", "lua", "^:", "^ " }, -- hide mapping boilerplate
-                show_help = true, -- show help message on the command line when the popup is visible
-                triggers = "auto", -- automatically setup triggers
-                -- triggers = {"<leader>"} -- or specify a list manually
-                triggers_blacklist = {
-                    -- list of mode / prefixes that should never be hooked by WhichKey
-                    -- this is mostly relevant for key maps that start with a native binding
-                    -- most people should not need to change this
-                    i = { "j", "k" },
-                    v = { "j", "k" },
-                },
-            }
-            -- Document e
-            -- existing key chains
-            which_key.register(which_key_mappins)
-        end,
+        event = "VeryLazy",
+        opts = {
+            -- your configuration comes here
+            -- or leave it empty to use the default settings
+            -- refer to the configuration section below
+            icons = {
+                mappings = false,
+            },
+            delay = 500,
+        },
+        keys = {
+            {
+                "<leader>?",
+                function()
+                    require("which-key").show { global = false }
+                end,
+                desc = "Buffer Local Keymaps (which-key)",
+            },
+        },
     },
     { -- Fuzzy Finder (files, lsp, etc)
         "nvim-telescope/telescope.nvim",
@@ -903,8 +851,8 @@ require("lazy").setup({
                         "--column",
                         "--smart-case",
                     },
-                    prompt_prefix = "  ",
-                    selection_caret = "  ",
+                    prompt_prefix = "",
+                    selection_caret = "",
                     -- selection_caret = "",
                     -- selection_strategy = "reset",
                     -- sorting_strategy = "ascending",
@@ -926,13 +874,13 @@ require("lazy").setup({
                             ["<C-n>"] = actions.cycle_history_next,
                             ["<C-p>"] = actions.cycle_history_prev,
 
-                            ["<C-j>"] = actions.move_selection_next,
-                            ["<C-k>"] = actions.move_selection_previous,
+                            ["<C-j>"] = actions.cycle_history_next,
+                            ["<C-k>"] = actions.cycle_history_next,
+
+                            ["<Tab>"] = actions.cycle_history_next,
+                            ["<S-Tab>"] = actions.cycle_history_prev,
 
                             ["<C-c>"] = actions.close,
-
-                            ["<Tab>"] = actions.move_selection_next,
-                            ["<S-Tab>"] = actions.move_selection_previous,
 
                             ["<CR>"] = actions.select_default,
                             ["<C-x>"] = actions.select_horizontal,
@@ -947,6 +895,7 @@ require("lazy").setup({
 
                             --["<Tab>"] = actions.toggle_selection + actions.move_selection_worse,
                             --["<S-Tab>"] = actions.toggle_selection + actions.move_selection_better,
+
                             ["<C-q>"] = actions.send_to_qflist + actions.open_qflist,
                             ["<M-q>"] = actions.send_selected_to_qflist + actions.open_qflist,
                             ["<C-l>"] = actions.complete_tag,
@@ -960,8 +909,9 @@ require("lazy").setup({
                             ["<C-v>"] = actions.select_vertical,
                             ["<C-t>"] = actions.select_tab,
 
-                            --["<Tab>"] = actions.toggle_selection + actions.move_selection_worse,
-                            --["<S-Tab>"] = actions.toggle_selection + actions.move_selection_better,
+                            ["<Tab>"] = actions.cycle_history_next,
+                            ["<S-Tab>"] = actions.cycle_history_prev,
+
                             ["<C-q>"] = actions.send_to_qflist + actions.open_qflist,
                             ["<M-q>"] = actions.send_selected_to_qflist + actions.open_qflist,
 
@@ -1460,6 +1410,9 @@ require("lazy").setup({
         end,
     },
     {
+        "folke/zen-mode.nvim",
+    },
+    {
         "folke/trouble.nvim",
         -- branch = "dev",
         enabled = true,
@@ -1622,6 +1575,131 @@ require("lazy").setup({
         end,
     },
     {
+        "nyoom-engineering/oxocarbon.nvim",
+        priority = 1000,
+        enabled = false,
+        config = function()
+            vim.cmd.colorscheme "oxocarbon"
+
+            local buffer_bg_color = get_color("Normal", "bg")
+            local buffer_fg_color = get_color("Normal", "fg")
+
+            vim.api.nvim_set_hl(0, "WinSeparator", { fg = buffer_bg_color, bg = buffer_bg_color })
+
+            vim.api.nvim_set_hl(0, "Statusline", { link = "NvimTreeWinSeparator" })
+            vim.api.nvim_set_hl(0, "StatusLineNC", { link = "NvimTreeWinSeparator" })
+            vim.api.nvim_set_hl(0, "NvimTreeStatusLineNC", { link = "NvimTreeWinSeparator" })
+
+            vim.api.nvim_set_hl(0, "TelescopePreviewTitle", { link = "TelescopeBorder" })
+            vim.api.nvim_set_hl(0, "TelescopePromptTitle", { link = "CursorLine" })
+
+            vim.api.nvim_set_hl(0, "TelescopeBorder", { fg = buffer_bg_color, bg = buffer_bg_color })
+            vim.api.nvim_set_hl(0, "TelescopeResultsBorder", { fg = buffer_bg_color, bg = buffer_bg_color })
+            vim.api.nvim_set_hl(0, "TelescopePreviewBorder", { fg = buffer_bg_color, bg = buffer_bg_color })
+            vim.api.nvim_set_hl(0, "TelescopePromptBorder", { fg = buffer_bg_color, bg = buffer_bg_color })
+            vim.api.nvim_set_hl(0, "TelescopePreviewHyphen", { fg = buffer_bg_color, bg = buffer_bg_color })
+            vim.api.nvim_set_hl(0, "TelescopePromptCounter", { fg = buffer_bg_color, bg = buffer_bg_color })
+            vim.api.nvim_set_hl(0, "TelescopeSelectionCaret", { fg = buffer_fg_color, bg = buffer_bg_color })
+
+            -- vim.api.nvim_set_hl(0, "TelescopePromptPrefix", { fg = buffer_bg_color, bg = buffer_bg_color })
+            -- vim.api.nvim_set_hl(0, "TelescopeSelection", { fg = buffer_fg_color, bg = buffer_bg_color })
+
+            vim.api.nvim_set_hl(0, "TelescopeMultiSelection", { fg = buffer_fg_color, bg = buffer_bg_color })
+            vim.api.nvim_set_hl(0, "TelescopeMultiIcon", { fg = buffer_bg_color, bg = buffer_bg_color })
+
+            -- vim.api.nvim_set_hl(0, "LspReferenceRead", { link = "Visual" })
+            -- vim.api.nvim_set_hl(0, "LspReferenceWrite", { link = "Visual" })
+            -- vim.api.nvim_set_hl(0, "LspReferenceText", { link = "Visual" })
+
+            vim.cmd.highlight("DiagnosticUnderlineError guisp=" .. get_color("DiagnosticError", "fg") .. " gui=undercurl")
+            vim.cmd.highlight("DiagnosticUnderlineWarn guisp=" .. get_color("DiagnosticWarn", "fg") .. " gui=undercurl")
+            vim.cmd.highlight("DiagnosticUnderlineOk guisp=" .. get_color("DiagnosticOk", "fg") .. " gui=undercurl")
+            vim.cmd.highlight("DiagnosticUnderlineHint guisp=" .. get_color("DiagnosticHint", "fg") .. " gui=undercurl")
+            vim.cmd.highlight("DiagnosticUnderlineInfo guisp=" .. get_color("DiagnosticInfo", "fg") .. " gui=undercurl")
+        end,
+    },
+    {
+        "catppuccin/nvim",
+        name = "catppuccin",
+        priority = 1000,
+        enabled = false,
+        config = function()
+            require("catppuccin").setup {
+                flavour = "mocha", -- latte, frappe, macchiato, mocha
+                no_bold = true,
+                no_underline = false,
+                color_overrides = {
+                    mocha = {
+                        rosewater = "#efc9c2",
+                        flamingo = "#ebb2b2",
+                        pink = "#f2a7de",
+                        mauve = "#b889f4",
+                        red = "#ea7183",
+                        maroon = "#ea838c",
+                        peach = "#f39967",
+                        yellow = "#eaca89",
+                        green = "#96d382",
+                        teal = "#78cec1",
+                        sky = "#91d7e3",
+                        sapphire = "#68bae0",
+                        blue = "#739df2",
+                        lavender = "#a0a8f6",
+                        text = "#b5c1f1",
+                        subtext1 = "#a6b0d8",
+                        subtext0 = "#959ec2",
+                        overlay2 = "#848cad",
+                        overlay1 = "#717997",
+                        overlay0 = "#63677f",
+                        surface2 = "#505469",
+                        surface1 = "#3e4255",
+                        surface0 = "#2c2f40",
+                        base = "#22232e",
+                        mantle = "#141620",
+                        crust = "#0e0f16",
+                    },
+                },
+            }
+
+            vim.cmd.colorscheme "catppuccin"
+
+            local buffer_bg_color = get_color("Normal", "bg")
+            local buffer_fg_color = get_color("Normal", "fg")
+
+            vim.api.nvim_set_hl(0, "WinSeparator", { fg = buffer_bg_color, bg = buffer_bg_color })
+
+            vim.api.nvim_set_hl(0, "Statusline", { link = "NvimTreeWinSeparator" })
+            vim.api.nvim_set_hl(0, "StatusLineNC", { link = "NvimTreeWinSeparator" })
+            vim.api.nvim_set_hl(0, "NvimTreeStatusLineNC", { link = "NvimTreeWinSeparator" })
+
+            vim.api.nvim_set_hl(0, "TelescopePreviewTitle", { link = "TelescopeBorder" })
+            vim.api.nvim_set_hl(0, "TelescopePromptTitle", { link = "CursorLine" })
+
+            vim.api.nvim_set_hl(0, "TelescopeBorder", { fg = buffer_bg_color, bg = buffer_bg_color })
+            vim.api.nvim_set_hl(0, "TelescopeResultsBorder", { fg = buffer_bg_color, bg = buffer_bg_color })
+            vim.api.nvim_set_hl(0, "TelescopePreviewBorder", { fg = buffer_bg_color, bg = buffer_bg_color })
+            vim.api.nvim_set_hl(0, "TelescopePromptBorder", { fg = buffer_bg_color, bg = buffer_bg_color })
+            vim.api.nvim_set_hl(0, "TelescopePreviewHyphen", { fg = buffer_bg_color, bg = buffer_bg_color })
+            vim.api.nvim_set_hl(0, "TelescopePromptCounter", { fg = buffer_bg_color, bg = buffer_bg_color })
+            vim.api.nvim_set_hl(0, "TelescopeSelectionCaret", { fg = buffer_fg_color, bg = buffer_bg_color })
+
+            -- vim.api.nvim_set_hl(0, "TelescopePromptPrefix", { fg = buffer_bg_color, bg = buffer_bg_color })
+            -- vim.api.nvim_set_hl(0, "TelescopeSelection", { fg = buffer_fg_color, bg = buffer_bg_color })
+
+            vim.api.nvim_set_hl(0, "TelescopeMultiSelection", { fg = buffer_fg_color, bg = buffer_bg_color })
+            vim.api.nvim_set_hl(0, "TelescopeMultiIcon", { fg = buffer_bg_color, bg = buffer_bg_color })
+
+            -- vim.api.nvim_set_hl(0, "LspReferenceRead", { link = "Visual" })
+            -- vim.api.nvim_set_hl(0, "LspReferenceWrite", { link = "Visual" })
+            -- vim.api.nvim_set_hl(0, "LspReferenceText", { link = "Visual" })
+
+            vim.cmd.highlight("DiagnosticUnderlineError guisp=" .. get_color("DiagnosticError", "fg") .. " gui=undercurl")
+            vim.cmd.highlight("DiagnosticUnderlineWarn guisp=" .. get_color("DiagnosticWarn", "fg") .. " gui=undercurl")
+            vim.cmd.highlight("DiagnosticUnderlineOk guisp=" .. get_color("DiagnosticOk", "fg") .. " gui=undercurl")
+            vim.cmd.highlight("DiagnosticUnderlineHint guisp=" .. get_color("DiagnosticHint", "fg") .. " gui=undercurl")
+            vim.cmd.highlight("DiagnosticUnderlineInfo guisp=" .. get_color("DiagnosticInfo", "fg") .. " gui=undercurl")
+        end,
+    },
+    {
         "NvChad/base46",
         -- commit = "b48abea",
         priority = 1000,
@@ -1634,6 +1712,8 @@ require("lazy").setup({
             require("base46").load_all_highlights()
 
             local buffer_bg_color = get_color("Normal", "bg")
+            local buffer_fg_color = get_color("Normal", "fg")
+
             vim.api.nvim_set_hl(0, "WinSeparator", { fg = buffer_bg_color, bg = buffer_bg_color })
 
             vim.api.nvim_set_hl(0, "Statusline", { link = "NvimTreeWinSeparator" })
@@ -1642,6 +1722,11 @@ require("lazy").setup({
 
             vim.api.nvim_set_hl(0, "TelescopePreviewTitle", { link = "TelescopeBorder" })
             vim.api.nvim_set_hl(0, "TelescopePromptTitle", { link = "CursorLine" })
+            vim.api.nvim_set_hl(0, "TelescopePreviewHyphen", { fg = buffer_bg_color, bg = buffer_bg_color })
+            vim.api.nvim_set_hl(0, "TelescopePromptCounter", { fg = buffer_bg_color, bg = buffer_bg_color })
+            vim.api.nvim_set_hl(0, "TelescopeSelectionCaret", { fg = buffer_fg_color, bg = buffer_bg_color })
+            vim.api.nvim_set_hl(0, "TelescopeMultiSelection", { fg = buffer_fg_color, bg = buffer_bg_color })
+            vim.api.nvim_set_hl(0, "TelescopeMultiIcon", { fg = buffer_bg_color, bg = buffer_bg_color })
 
             vim.api.nvim_set_hl(0, "LspReferenceRead", { link = "Visual" })
             vim.api.nvim_set_hl(0, "LspReferenceWrite", { link = "Visual" })
@@ -2276,7 +2361,7 @@ require("lazy").setup({
                 on_config_done = nil,
                 manual_mode = false,
                 detection_methods = { "pattern" },
-                patterns = { ".git", "_darcs", ".hg", ".bzr", ".svn", "Makefile", "package.json" },
+                patterns = { ".git", "_darcs", ".hg", ".bzr", ".svn", "package.json", "Makefile", ".clang-format", "CMakeLists.txt" },
                 show_hidden = false,
                 silent_chdir = true,
                 ignore_lsp = {},
@@ -2645,31 +2730,31 @@ require("lazy").setup({
                     }
 
                     return {
-                        fg = mode_color[vim.fn.mode()] or default_color,
+                        fg = default_color,
                         gui = "bold",
                     }
                 end,
             }
 
-            ins_left {
-                function()
-                    local current_file = vim.fn.expand "%:t"
-                    local extension = vim.fn.expand "%:e"
-                    local icon, _ = icons.get_icon(current_file, extension)
-
-                    if icon == nil then
-                        return ""
-                    else
-                        return icon
-                    end
-                end,
-                color = function()
-                    local current_file = vim.fn.expand "%:t"
-                    local extension = vim.fn.expand "%:e"
-                    local _, color = icons.get_icon_color(current_file, extension)
-                    return { fg = color }
-                end,
-            }
+            -- ins_left {
+            --     function()
+            --         local current_file = vim.fn.expand "%:t"
+            --         local extension = vim.fn.expand "%:e"
+            --         local icon, _ = icons.get_icon(current_file, extension)
+            --
+            --         if icon == nil then
+            --             return ""
+            --         else
+            --             return icon
+            --         end
+            --     end,
+            --     color = function()
+            --         local current_file = vim.fn.expand "%:t"
+            --         local extension = vim.fn.expand "%:e"
+            --         local _, color = icons.get_icon_color(current_file, extension)
+            --         return { fg = color }
+            --     end,
+            -- }
             ins_left {
                 function()
                     return vim.fn.expand "%:t"
