@@ -135,7 +135,7 @@ vim.cmd "set linespace=3"
 vim.g.neovide_refresh_rate = 165
 vim.g.neovide_refresh_rate_idle = 165
 vim.g.neovide_no_idle = true
-vim.g.neovide_confirm_quit = true
+vim.g.neovide_confirm_quit = false
 vim.g.neovide_fullscreen = false
 vim.g.neovide_frame = false
 
@@ -146,7 +146,7 @@ vim.g.neovide_floating_blur = true
 vim.g.neovide_remember_window_size = true
 vim.g.neovide_scale_factor = 1.20
 
-vim.g.neovide_cursor_animation_length = 0
+-- vim.g.neovide_cursor_animation_length = 0
 vim.g.neovide_scroll_animation_length = 0.25
 vim.g.neovide_cursor_animate_command_line = true
 
@@ -381,6 +381,21 @@ local function keymaps_lsp(event)
     map("gI", require("telescope.builtin").lsp_implementations, "Goto implementation")
     map("<leader>ld", require("telescope.builtin").lsp_type_definitions, "Type definition")
     map("<leader>ls", require("telescope.builtin").lsp_document_symbols, "Document symbols")
+
+    map("<leader>lf", function()
+        require("telescope.builtin").lsp_document_symbols { symbols = { "function", "method" } }
+    end, "Document functions")
+    map("<leader>lc", function()
+        require("telescope.builtin").lsp_document_symbols { symbols = { "class", "struct" } }
+    end, "Document classes")
+
+    map("<leader>lF", function()
+        require("telescope.builtin").lsp_dynamic_workspace_symbols { symbols = { "function", "method" } }
+    end, "Worspace functions")
+    map("<leader>lC", function()
+        require("telescope.builtin").lsp_dynamic_workspace_symbols { symbols = { "class", "struct" } }
+    end, "Worspace classes")
+
     map("<leader>lS", require("telescope.builtin").lsp_dynamic_workspace_symbols, "Workspace symbols")
     map("<leader>la", vim.lsp.buf.code_action, "Action")
 
@@ -871,14 +886,11 @@ require("lazy").setup({
                     set_env = { ["COLORTERM"] = "truecolor" }, -- default = nil,
                     mappings = {
                         i = {
-                            ["<C-n>"] = actions.cycle_history_next,
-                            ["<C-p>"] = actions.cycle_history_prev,
-
                             ["<C-j>"] = actions.cycle_history_next,
                             ["<C-k>"] = actions.cycle_history_next,
 
-                            ["<Tab>"] = actions.cycle_history_next,
-                            ["<S-Tab>"] = actions.cycle_history_prev,
+                            ["<Tab>"] = actions.move_selection_next,
+                            ["<S-Tab>"] = actions.move_selection_previous,
 
                             ["<C-c>"] = actions.close,
 
@@ -909,8 +921,8 @@ require("lazy").setup({
                             ["<C-v>"] = actions.select_vertical,
                             ["<C-t>"] = actions.select_tab,
 
-                            ["<Tab>"] = actions.cycle_history_next,
-                            ["<S-Tab>"] = actions.cycle_history_prev,
+                            ["<Tab>"] = actions.move_selection_next,
+                            ["<S-Tab>"] = actions.move_selection_previous,
 
                             ["<C-q>"] = actions.send_to_qflist + actions.open_qflist,
                             ["<M-q>"] = actions.send_selected_to_qflist + actions.open_qflist,
@@ -1590,10 +1602,9 @@ require("lazy").setup({
             vim.api.nvim_set_hl(0, "StatusLineNC", { link = "NvimTreeWinSeparator" })
             vim.api.nvim_set_hl(0, "NvimTreeStatusLineNC", { link = "NvimTreeWinSeparator" })
 
+            vim.api.nvim_set_hl(0, "TelescopeBorder", { link = "Normal" })
             vim.api.nvim_set_hl(0, "TelescopePreviewTitle", { link = "TelescopeBorder" })
-            vim.api.nvim_set_hl(0, "TelescopePromptTitle", { link = "CursorLine" })
-
-            vim.api.nvim_set_hl(0, "TelescopeBorder", { fg = buffer_bg_color, bg = buffer_bg_color })
+            -- vim.api.nvim_set_hl(0, "Tel escopePromptTitle", { link = "CursorLine" })
             vim.api.nvim_set_hl(0, "TelescopeResultsBorder", { fg = buffer_bg_color, bg = buffer_bg_color })
             vim.api.nvim_set_hl(0, "TelescopePreviewBorder", { fg = buffer_bg_color, bg = buffer_bg_color })
             vim.api.nvim_set_hl(0, "TelescopePromptBorder", { fg = buffer_bg_color, bg = buffer_bg_color })
@@ -1703,7 +1714,7 @@ require("lazy").setup({
         "NvChad/base46",
         -- commit = "b48abea",
         priority = 1000,
-        enabled = true,
+        enabled = false,
         init = function()
             vim.g.using_base46 = true
             vim.g.base46_cache = vim.fn.stdpath "config" .. "/nvcache/"
@@ -1918,12 +1929,110 @@ require("lazy").setup({
     --     end,
     -- },
     {
-        "wuelnerdotexe/vim-enfocado",
+        "tiagovla/tokyodark.nvim",
+        priority = 1000,
+        opts = {
+            styles = {
+                comments = { italic = false },
+                keywords = { italic = false },
+                identifiers = { italic = false },
+                functions = { italic = false },
+                variables = { italic = false },
+            },
+            custom_palette = function(palette)
+                return {
+                    fg = "#696d80",
+                }
+            end,
+        },
+        config = function(_, opts)
+            require("tokyodark").setup(opts) -- calling setup is optional
+            vim.cmd [[colorscheme tokyodark]]
+            vim.api.nvim_set_hl(0, "@variable", { fg = "#a9afcf" })
+        end,
+    },
+    {
+        "rose-pine/neovim",
+        priority = 1000,
+        enabled = false,
+        config = function()
+            require("rose-pine").setup {
+                variant = "main", -- auto, main, moon, or dawn
+                dark_variant = "main", -- main, moon, or dawn
+                dim_inactive_windows = false,
+                extend_background_behind_borders = true,
+
+                enable = {
+                    terminal = true,
+                    legacy_highlights = true, -- Improve compatibility for previous versions of Neovim
+                    migrations = true, -- Handle deprecated options automatically
+                },
+
+                styles = {
+                    bold = false,
+                    italic = false,
+                    transparency = false,
+                },
+
+                palette = {
+                    -- Override the builtin palette per variant
+                    -- moon = {
+                    --     base = '#18191a',
+                    --     overlay = '#363738',
+                    -- },
+                },
+
+                -- NOTE: Highlight groups are extended (merged) by default. Disable this
+                -- per group via `inherit = false`
+                highlight_groups = {
+                    -- Comment = { fg = "foam" },
+                    -- StatusLine = { fg = "love", bg = "love", blend = 15 },
+                    -- VertSplit = { fg = "muted", bg = "muted" },
+                    -- Visual = { fg = "base", bg = "text", inherit = false },
+                },
+
+                before_highlight = function(group, highlight, palette)
+                    -- Disable all undercurls
+                    -- if highlight.undercurl then
+                    --     highlight.undercurl = false
+                    -- end
+                    --
+                    -- Change palette colour
+                    -- if highlight.fg == palette.pine then
+                    --     highlight.fg = palette.foam
+                    -- end
+                end,
+            }
+
+            vim.cmd "colorscheme rose-pine"
+            -- vim.cmd("colorscheme rose-pine-main")
+            -- vim.cmd("colorscheme rose-pine-moon")
+            -- vim.cmd("colorscheme rose-pine-dawn")
+        end,
+    },
+    {
+        "artart222/nvim-enfocado",
         priority = 1000,
         enabled = false,
         init = function()
-            vim.g.enfocado_style = "nature"
+            vim.g.enfocado_style = "neon"
+            vim.g.enfocado_plugins = {
+                "coc",
+                "copilot",
+                "alpha",
+                "fzf",
+                "nerdtree",
+                "cmp",
+                "lsp",
+                "lsp-installer",
+                "notify",
+                "scrollview",
+            }
             vim.cmd.colorscheme "enfocado"
+
+            local hl = vim.api.nvim_get_hl(0, { name = "Function" })
+            hl.italic = false
+            vim.api.nvim_set_hl(0, "Function", hl)
         end,
     },
     {
@@ -2872,5 +2981,32 @@ require("lazy").setup({
     },
 })
 
--- The line beneath this is called `modeline`. See `:help modeline`
--- vim: ts=2 sts=2 sw=2 et
+local buffer_bg_color = get_color("Normal", "bg")
+local buffer_fg_color = get_color("Normal", "fg")
+
+vim.api.nvim_set_hl(0, "WinSeparator", { fg = buffer_bg_color, bg = buffer_bg_color })
+vim.api.nvim_set_hl(0, "CursorLineFold", { link = "WinSeparator" })
+vim.api.nvim_set_hl(0, "SignColumn", { link = "WinSeparator" })
+vim.api.nvim_set_hl(0, "FoldColumn", { link = "WinSeparator" })
+vim.api.nvim_set_hl(0, "EndOfBuffer", { link = "WinSeparator" })
+
+vim.api.nvim_set_hl(0, "Statusline", { link = "WinSeparator" })
+vim.api.nvim_set_hl(0, "StatusLineNC", { link = "WinSeparator" })
+vim.api.nvim_set_hl(0, "NvimTreeStatusLineNC", { link = "WinSeparator" })
+
+vim.api.nvim_set_hl(0, "TelescopeBorder", { link = "WinSeparator" })
+vim.api.nvim_set_hl(0, "TelescopePromptBorder", { link = "WinSeparator" })
+vim.api.nvim_set_hl(0, "TelescopeResultsBorder", { link = "WinSeparator" })
+vim.api.nvim_set_hl(0, "TelescopePreviewBorder", { link = "WinSeparator" })
+
+-- vim.api.nvim_set_hl(0, "TelescopePreviewHyphen", { link = "WinSeparator" })
+-- vim.api.nvim_set_hl(0, "TelescopePromptCounter", { link = "WinSeparator" })
+-- vim.api.nvim_set_hl(0, "TelescopeSelectionCaret", { link = "WinSeparator" })
+-- vim.api.nvim_set_hl(0, "TelescopeMultiIcon", { link = "WinSeparator" })
+-- vim.api.nvim_set_hl(0, "TelescopeMultiSelection", { link = "TelescopeSelection" })
+--
+vim.cmd.highlight("DiagnosticUnderlineError guisp=" .. get_color("DiagnosticError", "fg") .. " gui=undercurl")
+vim.cmd.highlight("DiagnosticUnderlineWarn guisp=" .. get_color("DiagnosticWarn", "fg") .. " gui=undercurl")
+vim.cmd.highlight("DiagnosticUnderlineOk guisp=" .. get_color("DiagnosticOk", "fg") .. " gui=undercurl")
+vim.cmd.highlight("DiagnosticUnderlineHint guisp=" .. get_color("DiagnosticHint", "fg") .. " gui=undercurl")
+vim.cmd.highlight("DiagnosticUnderlineInfo guisp=" .. get_color("DiagnosticInfo", "fg") .. " gui=undercurl")
