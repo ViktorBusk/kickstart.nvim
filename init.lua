@@ -41,6 +41,18 @@ local function get_color(highlight, layer)
     return vim.fn.synIDattr(vim.fn.synIDtrans(vim.fn.hlID(highlight)), layer or "fg", "gui")
 end
 
+if vim.fn.has "win32" == 1 then
+    function Log(...)
+        local str = vim.inspect(...)
+        vim.fn.writefile({ str }, vim.fn.expand "$TEMP" .. "/nvim_debug.log", "a")
+    end
+else
+    function Log(...)
+        local str = vim.inspect(...)
+        vim.fn.writefile({ str }, "/tmp/nvim_debug.log", "a")
+    end
+end
+
 -- Set <space> as the leader key
 -- See `:help mapleader`
 --  NOTE: Must happen before plugins are loaded (otherwise wrong leader will be used)
@@ -126,7 +138,8 @@ vim.opt.sidescrolloff = 8
 vim.opt.cinkeys = "0{,0},0),0],0#,!^F,o,O,e"
 
 -- GUI settings
---vim.opt.guifont = "NotoSansM Nerd Font:h12"
+-- vim.opt.guifont = "NotoSansM Nerd Font:h12"
+-- vim.opt.guifont = "Consolas Nerd Font:h12:w2"
 --vim.opt.foldcolumn = "2"
 -- NOTE: This will be updated dynamically
 vim.opt.signcolumn = "yes:1"
@@ -144,7 +157,7 @@ vim.g.neovide_transparency = 1.0
 vim.g.neovide_floating_opacity = 0.4
 vim.g.neovide_floating_blur = true
 vim.g.neovide_remember_window_size = true
-vim.g.neovide_scale_factor = 1.20
+vim.g.neovide_scale_factor = 1.0
 
 -- vim.g.neovide_cursor_animation_length = 0
 vim.g.neovide_scroll_animation_length = 0.25
@@ -185,16 +198,16 @@ local change_scale_factor = function(delta)
 end
 
 vim.keymap.set("n", "<c-+>", function()
-    change_scale_factor(1.10)
+    change_scale_factor(1.05)
 end)
 vim.keymap.set("n", "<c-->", function()
-    change_scale_factor(1 / 1.10)
+    change_scale_factor(1 / 1.05)
 end)
 vim.keymap.set("n", "<C-ScrollWheelUp>", function()
-    change_scale_factor(1.10)
+    change_scale_factor(1.05)
 end)
 vim.keymap.set("n", "<C-ScrollWheelDown>", function()
-    change_scale_factor(1 / 1.10)
+    change_scale_factor(1 / 1.05)
 end)
 
 -- Navigation in insert mode
@@ -342,8 +355,8 @@ end, { desc = "Config Files" })
 
 -- TODO: DRY
 vim.keymap.set("n", "<c-s-b>", function()
-    local cmd = ".\\build.bat vs2022 debug run raddbg"
-    _MS_BUILD_TOGGLE(cmd)
+    local cmd = "make tests && raddbg --ipc run"
+    _CPP_BUILD_TOGGLE(cmd)
 end)
 
 vim.keymap.set("n", "<c-s-d>", function()
@@ -382,14 +395,14 @@ local function keymaps_lsp(event)
     map("<leader>ld", require("telescope.builtin").lsp_type_definitions, "Type definition")
     map("<leader>ls", require("telescope.builtin").lsp_document_symbols, "Document symbols")
 
-    map("<leader>lf", function()
+    map("<leader>lm", function()
         require("telescope.builtin").lsp_document_symbols { symbols = { "function", "method" } }
     end, "Document functions")
     map("<leader>lc", function()
         require("telescope.builtin").lsp_document_symbols { symbols = { "class", "struct" } }
     end, "Document classes")
 
-    map("<leader>lF", function()
+    map("<leader>lM", function()
         require("telescope.builtin").lsp_dynamic_workspace_symbols { symbols = { "function", "method" } }
     end, "Worspace functions")
     map("<leader>lC", function()
@@ -1052,6 +1065,8 @@ require("lazy").setup({
                 callback = function(event)
                     -- Map lsp keybindings
                     keymaps_lsp(event)
+                    -- Enable inlay hints
+                    vim.lsp.inlay_hint.enable(true, { bufnr = event.buf })
 
                     -- When you move your cursor, the highlights will be cleared (the second autocommand).
                     local client = vim.lsp.get_client_by_id(event.data.client_id)
@@ -1096,7 +1111,7 @@ require("lazy").setup({
                         "clangd",
                         "-j=6",
                         "--background-index",
-                        "--log=verbose",
+                        "--log=error",
                         "--clang-tidy",
                         "--limit-references=20",
                         "--limit-results=20",
@@ -1515,49 +1530,77 @@ require("lazy").setup({
         --     },
     },
     {
+        "Mofiqul/vscode.nvim",
+        config = function()
+            require("vscode").setup {}
+            vim.cmd.colorscheme "vscode"
+
+            vim.api.nvim_set_hl(0, "@lsp.type.macro", { link = "@keyword" })
+            vim.api.nvim_set_hl(0, "@function.macro", { link = "@keyword.import" })
+            vim.api.nvim_set_hl(0, "@keyword.directive", { link = "@keyword.import" })
+            vim.api.nvim_set_hl(0, "@attribute", { link = "@type" })
+            vim.api.nvim_set_hl(0, "@function.builtin", { link = "@keyword" })
+            vim.api.nvim_set_hl(0, "@lsp.typemod.type.defaultLibrary.cpp", { link = "@type" })
+            vim.api.nvim_set_hl(0, "@string.escape", { fg = "#d7ba7d" })
+            vim.api.nvim_set_hl(0, "@lsp.type.variable.cpp", { link = "@variable" })
+
+            -- Add colors for c-format specifiers
+            -- vim.api.nvim_create_autocmd("FileType", {
+            --     pattern = { "c", "cpp" },
+            --     callback = function()
+            --         vim.fn.matchadd("@variable", "%[-+ #0]*\\*\\?\\d*\\.\\?\\d*[hlLzjt]*[diouxXeEfFgGaAcspn%]")
+            --     end,
+            -- })
+
+            -- vim.api.nvim_set_hl(0, "@operator", { link = "@keyword" })
+        end,
+    },
+    {
         "LunarVim/Colorschemes",
         priority = 1000, -- Make sure to load this before all the other start plugins.
-        enabled = true,
-        -- init = function()
-        --     vim.cmd.colorscheme "onedark"
-        --
-        --     local buffer_bg_color = get_color("BufferCurrent", "bg")
-        --     local comment_color = get_color "Comment"
-        --     local onedark_palette = require "onedark.palette"
-        --
-        --     vim.api.nvim_set_hl(0, "WinSeparator", { fg = buffer_bg_color, bg = buffer_bg_color })
-        --
-        --     vim.api.nvim_set_hl(0, "Type", { fg = onedark_palette.cyan, italic = false, bold = false })
-        --     vim.api.nvim_set_hl(0, "@storageclass", { fg = onedark_palette.cyan, italic = false, bold = false })
-        --     vim.api.nvim_set_hl(0, "Structure", { fg = onedark_palette.cyan, italic = false, bold = false })
-        --     vim.api.nvim_set_hl(0, "Function", { fg = onedark_palette.blue, italic = false, bold = false })
-        --     vim.api.nvim_set_hl(0, "@function.builtin", { fg = onedark_palette.cyan, italic = false, bold = false })
-        --     vim.api.nvim_set_hl(0, "@method", { link = "Function" })
-        --     vim.api.nvim_set_hl(0, "Keyword", { fg = onedark_palette.purple, italic = false, bold = false })
-        --     vim.api.nvim_set_hl(0, "Conditional", { fg = onedark_palette.purple, italic = false, bold = false })
-        --     vim.api.nvim_set_hl(0, "Constant", { fg = onedark_palette.orange, italic = false, bold = false })
-        --     vim.api.nvim_set_hl(0, "Boolean", { fg = onedark_palette.orange, italic = false, bold = false })
-        --
-        --     vim.api.nvim_set_hl(0, "String", { fg = onedark_palette.green, italic = false, bold = false })
-        --     vim.api.nvim_set_hl(0, "@string.escape", { fg = onedark_palette.cyan, italic = false, bold = false })
-        --     vim.api.nvim_set_hl(0, "@string.special", { fg = onedark_palette.cyan, italic = false, bold = false })
-        --
-        --     vim.api.nvim_set_hl(0, "@field", { fg = onedark_palette.red, italic = false, bold = false })
-        --     vim.api.nvim_set_hl(0, "@property", { fg = onedark_palette.red, italic = false, bold = false })
-        --     vim.api.nvim_set_hl(0, "@lsp.type.property", { fg = onedark_palette.red, italic = false, bold = false })
-        --
-        --
-        --     vim.api.nvim_set_hl(0, "@operator", { fg = onedark_palette.purple, italic = false, bold = false })
-        --
-        --     -- vim.api.nvim_set_hl(0, "@parameter", { fg = onedark_palette.orange, italic = true, bold = false })
-        --     -- vim.api.nvim_set_hl(0, "@lsp.type.parameter", { fg = onedark_palette.orange, italic = true, bold = false })
-        --
-        --     vim.api.nvim_set_hl(0, "CmpItemKind", { bold = true })
-        --     vim.api.nvim_set_hl(0, "CmpItemAbbr", { fg = onedark_palette.alt_fg, italic = false, bold = false })
-        --     vim.api.nvim_set_hl(0, "CmpItemKindText", { fg = onedark_palette.alt_fg, italic = false, bold = false })
-        --     vim.api.nvim_set_hl(0, "CmpItemAbbrMatch", { fg = onedark_palette.fg, italic = false, bold = false })
-        --     vim.api.nvim_set_hl(0, "CmpItemAbbrMatchFuzzy", { fg = onedark_palette.fg, italic = false, bold = false })
-        -- end,
+        enabled = false,
+        init = function()
+            -- vim.cmd.colorscheme "darkplus"
+            -- vim.api.nvim_set_hl(0, "@variable", { link = "@property" })
+            -- vim.api.nvim_set_hl(0, "@keyword", { link = "Define" })
+            -- vim.api.nvim_set_hl(0, "@lsp.type.namespace", { link = "@lsp.type.class" })
+            -- vim.api.nvim_set_hl(0, "@lsp.type.enum", { link = "@lsp.type.enumMember" })
+            -- vim.api.nvim_set_hl(0, "@lsp.type.enum", { link = "@lsp.type.enumMember" })
+
+            -- local onedark_palette = require "onedark.palette"
+            --
+            -- vim.api.nvim_set_hl(0, "Normal", { fg = "#696D80", bg = "#11121D", italic = false, bold = false })
+            --
+            -- vim.api.nvim_set_hl(0, "Type", { fg = onedark_palette.cyan, italic = false, bold = false })
+            -- vim.api.nvim_set_hl(0, "@storageclass", { fg = onedark_palette.cyan, italic = false, bold = false })
+            -- vim.api.nvim_set_hl(0, "Structure", { fg = onedark_palette.cyan, italic = false, bold = false })
+            -- vim.api.nvim_set_hl(0, "Function", { fg = onedark_palette.blue, italic = false, bold = false })
+            -- vim.api.nvim_set_hl(0, "@function.builtin", { fg = onedark_palette.cyan, italic = false, bold = false })
+            -- vim.api.nvim_set_hl(0, "@method", { link = "Function" })
+            -- vim.api.nvim_set_hl(0, "Keyword", { fg = onedark_palette.purple, italic = false, bold = false })
+            -- vim.api.nvim_set_hl(0, "Conditional", { fg = onedark_palette.purple, italic = false, bold = false })
+            -- vim.api.nvim_set_hl(0, "Constant", { fg = onedark_palette.orange, italic = false, bold = false })
+            -- vim.api.nvim_set_hl(0, "Boolean", { fg = onedark_palette.orange, italic = false, bold = false })
+            --
+            -- vim.api.nvim_set_hl(0, "String", { fg = onedark_palette.green, italic = false, bold = false })
+            -- vim.api.nvim_set_hl(0, "@string.escape", { fg = onedark_palette.cyan, italic = false, bold = false })
+            -- vim.api.nvim_set_hl(0, "@string.special", { fg = onedark_palette.cyan, italic = false, bold = false })
+            --
+            -- vim.api.nvim_set_hl(0, "@field", { fg = onedark_palette.red, italic = false, bold = false })
+            -- vim.api.nvim_set_hl(0, "@property", { fg = onedark_palette.red, italic = false, bold = false })
+            -- vim.api.nvim_set_hl(0, "@lsp.type.property", { fg = onedark_palette.red, italic = false, bold = false })
+            --
+            -- vim.api.nvim_set_hl(0, "@operator", { fg = onedark_palette.purple, italic = false, bold = false })
+            --
+            -- -- vim.api.nvim_set_hl(0, "@parameter", { fg = onedark_palette.orange, italic = true, bold = false })
+            -- -- vim.api.nvim_set_hl(0, "@lsp.type.parameter", { fg = onedark_palette.orange, italic = true, bold = false })
+            --
+            -- vim.api.nvim_set_hl(0, "CmpItemKind", { bold = true })
+            -- vim.api.nvim_set_hl(0, "CmpItemAbbr", { fg = onedark_palette.alt_fg, italic = false, bold = false })
+            -- vim.api.nvim_set_hl(0, "CmpItemKindText", { fg = onedark_palette.alt_fg, italic = false, bold = false })
+            -- vim.api.nvim_set_hl(0, "CmpItemAbbrMatch", { fg = onedark_palette.fg, italic = false, bold = false })
+            -- vim.api.nvim_set_hl(0, "CmpItemAbbrMatchFuzzy", { fg = onedark_palette.fg, italic = false, bold = false })
+        end,
     },
     {
         "AxelGard/oneokai.nvim",
@@ -1931,6 +1974,7 @@ require("lazy").setup({
     {
         "tiagovla/tokyodark.nvim",
         priority = 1000,
+        enabled = false,
         opts = {
             styles = {
                 comments = { italic = false },
@@ -2037,9 +2081,28 @@ require("lazy").setup({
     },
     {
         "HiPhish/rainbow-delimiters.nvim",
-        enabled = false,
+        enabled = true,
         config = function()
-            require("rainbow-delimiters.setup").setup {}
+            vim.api.nvim_set_hl(0, "RainbowYellow", { fg = "#ffd700" })
+            vim.api.nvim_set_hl(0, "RainbowViolet", { fg = "#da70d6" })
+            vim.api.nvim_set_hl(0, "RainbowBlue", { fg = "#179fff" })
+            require("rainbow-delimiters.setup").setup {
+                strategy = {
+                    [""] = "rainbow-delimiters.strategy.global",
+                },
+                highlight = {
+                    "RainbowYellow",
+                    "RainbowViolet",
+                    "RainbowBlue",
+                },
+            }
+            vim.api.nvim_create_autocmd("ColorScheme", {
+                callback = function()
+                    vim.api.nvim_set_hl(0, "RainbowYellow", { fg = "#ffd700" })
+                    vim.api.nvim_set_hl(0, "RainbowViolet", { fg = "#da70d6" })
+                    vim.api.nvim_set_hl(0, "RainbowBlue", { fg = "#179fff" })
+                end,
+            })
         end,
     },
     -- {
@@ -2371,89 +2434,61 @@ require("lazy").setup({
             end
 
             local found_error = false
-            local msbuild = Terminal:new {
+            local stream = ""
+
+            local function strip_ansi(str)
+                return str
+                    :gsub("\27%[[%d;]*%a", "") -- CSI sequences: \27[...m
+                    :gsub("\27%[%?%d+%a", "") -- private sequences: \27[?25l
+                    :gsub("\27%]%d+;[^\a]*\a", "") -- OSC sequences: \27]0;...\a
+                    :gsub("\27[^%[%]]", "") -- other escape sequences
+                    :gsub("\13", "") -- carriage return
+                    :gsub("\8", "") -- backspace \b
+            end
+            local clang_build = Terminal:new {
                 hidden = true,
                 display_name = "Build",
                 close_on_exit = true,
-                -- stderr does not work with neovim i guess
-                -- parse stdout instead
                 on_stdout = function(t, job, data, name)
                     if found_error == true then
                         return
                     end
-
-                    local stream = ""
                     for _, line in pairs(data) do
-                        stream = stream .. line
-                        -- look for: error C12345
-                        local start_idx, _ = string.find(stream, "%serror%s[A-Z0-9]+:%s")
-                        if start_idx then
-                            local text = ""
-                            local error = nil
-                            -- loop backwards and find the first "("
-                            for i = start_idx - 1, 1, -1 do
-                                local char = stream:sub(i, i)
-
-                                if error == nil then
-                                    if char == "(" then
-                                        error = text
-                                        text = ""
-                                    end
-                                end
-                                text = char .. text
-                            end
-
-                            -- Remove last (
-                            text = string.sub(text, 1, -2)
-
-                            -- Define a pattern to match Windows paths
-                            local pattern = "([A-Za-z]:\\[^%c%s]+)"
-
-                            local filepath = text:match(pattern)
-                            if vim.fn.filereadable(filepath) == 1 then
+                        stream = stream .. strip_ansi(line)
+                        local filepath, row, col = stream:match "([%w%.%/\\%-_]+):(%d+):(%d+): error:"
+                        if filepath then
+                            local full_path = Cpp_build_root_dir .. "/" .. filepath
+                            if vim.fn.filereadable(full_path) == 1 then
                                 found_error = true
-                                local function get_pos(str)
-                                    local l, c = str:match "(%d+),(%d+)"
-                                    return { tonumber(l), tonumber(c) }
-                                end
-                                -- Handle string conversion errors
-                                local valid_pos, pos = pcall(get_pos, error)
-                                if not valid_pos then
-                                    return
-                                end
-                                -- Change focus to the previous window
-                                -- vim.cmd "wincmd p"
-                                -- Open the file
-                                vim.cmd("edit " .. filepath)
-                                -- Move cursor to errror
-                                vim.cmd("normal " .. pos[1] .. "G") -- Move to the specified line
-                                vim.cmd("normal " .. pos[2] .. "|") -- Move to the specified column
+                                vim.cmd("edit " .. full_path)
+                                vim.cmd("normal " .. row .. "G")
+                                vim.cmd("normal " .. col .. "|")
                             end
                         end
                     end
                 end,
             }
-
-            function _MS_BUILD_TOGGLE(cmd)
+            function _CPP_BUILD_TOGGLE(cmd)
                 if vim.fn.has "win32" == 0 then
                     error "Only Win32 supported"
                     return
                 end
 
-                local root_patterns = { "build.bat", "build.sh" }
-                local root_dir = vim.fs.dirname(vim.fs.find(root_patterns, { upward = true })[1])
+                local root_patterns = { "Makefile" }
+                Cpp_build_root_dir = vim.fs.dirname(vim.fs.find(root_patterns, { upward = true })[1])
 
                 -- Build file not found
-                if root_dir == nil then
+                if Cpp_build_root_dir == nil then
                     error "Build file not found"
                     return
                 end
 
-                if not msbuild:is_open() then
-                    msbuild:open()
+                if not clang_build:is_open() then
+                    clang_build:open()
                 end
-                msbuild:send(cmd, true)
+                clang_build:send(cmd, true)
                 found_error = false
+                stream = ""
             end
         end,
     },
@@ -2980,6 +3015,8 @@ require("lazy").setup({
         },
     },
 })
+
+-- vim.cmd.colorscheme "darkplus"
 
 local buffer_bg_color = get_color("Normal", "bg")
 local buffer_fg_color = get_color("Normal", "fg")
